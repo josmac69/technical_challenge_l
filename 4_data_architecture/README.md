@@ -108,9 +108,27 @@ Price calculation will be encapsulated in a separate part of service and can be 
   - For new comers we can require to charge money in advance to be able to use our parking lots. Or we can subtract money from their electronic wallet associated with our account.
   - For long term users or for companies we can allow to pay after the fact. Account will accumulate required amount and system will send them an invoice at the end of the month.
 
-###### Technical overview
-**Parking lot gates**
+###### Authentication
 
+
+##### Technical overview
+**Mobile app**
+Mobile app must handle the following tasks:
+* Creation / update / deletion of user account
+* Show QR code for user account for entering / exiting parking lot. Content of QR code should be not trivial to prevent frauds.
+* Show status of user account - current balance, list of transactions, list of parking lots used in the past.
+  * For advanced versions also list of parking lots used in the future (if user already booked parking lot in advance)
+* Show list of available parking lots with their current state based on user location
+* Show details of selected parking lot including indication of frequency of current traffic on parking lot and prediction of available spaces in the next 30 minutes/1 hour.
+* Mobile app must indicate if there is a problem with network connection on specific parking lot and must indicate that system works offline and therefore app cannot show current state of parking lot.
+
+**Parking lot devices**
+Technical devices stationary on parking lot must be able to handle the following tasks:
+* Scan QR and validate if user can enter parking lot - i.e. if user has a valid account and if user has enough money on his account to be able to enter parking lot or has payment model which allows him to enter parking lot due to subscription or "pay after the fact" model.
+  * System must be able to handle cases when user has no internet connection and must be able to validate user account locally.
+* Entry/exit gate must be able to recognize if car is present to prevent frauds.
+* Validate if parking lot really has available space for user to enter
+* Handle possible network issues by storing events locally and sending them to the server when network is available again.
 
 #### PoC solution
 **Assumptions for PoC:**
