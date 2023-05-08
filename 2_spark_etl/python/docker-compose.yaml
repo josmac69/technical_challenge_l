@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:latest
+    container_name: my_postgres
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: main
+    ports:
+      - "5432:5432"
+
+  spark:
+    image: bitnami/spark:3
+    depends_on:
+      - postgres
+    volumes:
+      - ./submit.sh:/app/submit.sh
+      - ./script.py:/app/script.py
+      - ../events.csv:/data/events.csv
+    command: /app/submit.sh
