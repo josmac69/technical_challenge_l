@@ -12,7 +12,10 @@ We are managing parking lots that a client can check with a mobile app. An app c
 ## Solution
 
 ### General overview of the solution
-The whole task is very narrowly defined. Data gathered by the app are very simple and relational by design.
+The definition of the whole task is would require further discussions to understand better all the details.
+But since this is a technical challenge I will set some assumptions and provide solution based on them.
+
+Data gathered by the app are very simple and relational by design.
 We need to use transactional database with strong consistency to avoid over booking of parking lots.
 
 ### General features of the solution
@@ -80,30 +83,54 @@ The whole process of designing the solution was based on the pragmatic principle
 
 #### Implementation of the solution
 
-Based on pragmatic principle mentioned above, I will first create a PoC (Proof of Concept) solution. This PoC will be a simple solution that will be able to handle the most basic use cases. After that, I will iterate over the PoC and improve it by adding new features and extending the functionality for handling more complex use cases.
+Based on pragmatic principle mentioned above, I will first discuss a PoC (Proof of Concept) solution. This PoC will be a simple solution that will be able to handle the most basic use cases. After that, I will iterate over the PoC and improve it by adding new features and extending the functionality for handling more complex use cases.
 
+##### Analysis
+
+###### System overview
+- Parking lot is an area designated for the parking of vehicles, usually outdoors and located near a building, shopping center, or public area.
+It typically consists of a paved surface with marked parking spaces. It's capacity is fixed and defined by the number of parking spaces.
+- Even with hundreds of parking spaces available on one parking lot, frequency of events for one specific parking lot is actually quite small. Only a few events per minute for one parking lot. Frequency will be limited by capacity of entrance/exit gates. How many cars can enter/exit parking lot per minute. Many parking lots in real life can just 1 entry and 1 exit gate. Sometimes with 2 lanes, very rarely with more lines.
+  - Frequency of events can grow only in case we start managing multiple parking lots.
+- Data will be highly seasonal, with peaks during rush hours and in case of sales, Black Friday, days before Christmas etc. But even in this scope frequency of events is still quite small because we are still limited by capacity of gates.
+- Cars stay in the parking lot for quite a long time - dozens of minutes or hours. Shorter stays are not common.
+- For different use cases we can have different types of parking lots - for passenger cars, for trucks, for buses, for motorcycles, for bicycles, for disabled people etc. These will require different handling by a system.
+
+###### Pricing model
+Price calculation will be encapsulated in a separate part of service and can be developed and improved independently.
+- Dynamic pricing model is required for common users.
+  - Price will depend on the current state of the parking lot - number of available spaces.
+  - The price will be higher when the parking lot is almost full and lower when the parking lot is almost empty.
+  - One possible way of implementing price could be for example: `price = base_price * (1 + (total_capacity - available_spaces) / total_capacity)`.
+- For long term users we can use a different price model. For example, we can offer a monthly subscription with a fixed price or discounts from normal price.
+
+- Pricing model relates to the execution of payments.
+  - For new comers we can require to charge money in advance to be able to use our parking lots. Or we can subtract money from their electronic wallet associated with our account.
+  - For long term users or for companies we can allow to pay after the fact. Account will accumulate required amount and system will send them an invoice at the end of the month.
+
+###### Technical overview
+**Parking lot gates**
+
+
+#### PoC solution
 **Assumptions for PoC:**
-- In PoC we are managing only 1 parking estate.
-- The whole parking estate is a physical location with a fixed capacity.
-- There will be only one type of parking lot available - standard parking lot for passenger cars.
-- We will use dynamic pricing model - price will depend on the current state of the parking estate (number of available spaces). The price will be higher when the parking estate is almost full and lower when the parking estate is almost empty.
-- There will be no discounts for long term users.
-- Even with hundreds of parking lots available, frequency of events is actually quite small in order of minutes or hours.
-- Cars stay in the parking lots for quite a long time - dozens of minutes or hours. Shorter stays are not common.
-- Data will be highly seasonal, with peaks during rush hours. But even in this scope frequency of events is still quite small.
-- There are no dedicated / reserved parking lots for specific users. Any user can park in any parking lot. Only limitation for using our parking lots is that the user must have a valid account with us.or thousands
+- In PoC we manage only 1 parking lot but data model will be prepared to handle multiple lots.
+- There will be only one type of parking spaces available - standard parking space for passenger cars.
+- Pricing model will be very simple - just dynamic pricing based on capacity.
+- There are no dedicated / reserved parking spaces for specific users. Any user can park in any parking space. Only limitation for using our parking lot is that the user must have a valid account with us or thousands
 - We presume all users will be always able to use mobile app to enter/exit parking lot. We will not consider any other entry/exit methods for PoC.
-- For PoC we will consider only one payment method per user. And for the sake of simplicity we presume that user must charge money in advance to be able to use our parking lots. We will check for minimum amount available to be able to enter the parking lot. If the user does not have enough money on his account, he will not be able to enter the parking estate.
-- There will no accounts for multiple users. We presume one user ID per one App. One user can have multiple Apps on multiple devices, but for one entry to the parking estate can use only one App at the time.
+- For PoC we will consider only one payment method per user. And for the sake of simplicity we presume that user must charge money in advance to be able to use our parking lot. We will check for minimum amount available to be able to enter the parking lot. If the user does not have enough money on his account, he will not be able to enter the parking lot.
+- There will no accounts for multiple users. We presume one user ID per one App. One user can have multiple Apps on multiple devices, but for one entry to the parking lot can use only one App at the time.
 
 **More complex use cases:**
-- In the future we will manage multiple parking estates.
-- This way we will have thousands of parking lots available which will significantly increase the frequency of events. So with dozens or hundreds parking estates we can expect even hundreds of events per minute.
-- On some parking estates we will have dedicated / reserved parking lots for specific users. These must stay empty if the owners are not using them.
-- On some parking estates we will have specialized parking lots for specific types of vehicles (e.g. electric cars, trucks, etc.). With different pricing models and different capacity.
-- User can have multiple payment methods. And for selected users ranked by their loyalty and amount spent (or other criteria)  we will allow them to enter the parking estate even if they do not have enough money on their account. We will charge them later. But there will be some limit for the negative balance.
-- We can allow group accounts for multiple users. This way multiple users could use the same account to enter the parking estate. This could be useful for companies with multiple employees.
+- In the future we will manage multiple parking lots.
+- This way we will have thousands of parking spaces available which will significantly increase the frequency of events. Although frequency for one specific parking lot will still be quite small.
+  - With dozens or hundreds parking lots we can expect even hundreds of events per minute in peak hours.
+- On some parking lots we will have dedicated / reserved parking spaces for specific users. These must stay empty if the owners are not using them.
+- On some parking lots we will have specialized parking spaces for specific types of vehicles - e.g. electric cars, trucks, etc. Or for specialized type of clients like disabled people. These will have different pricing models.
+- User can have multiple payment methods. And for selected ranked users we will allow negative state of account and payments after the fact.
+- We can allow group accounts for multiple users. This way multiple users could use the same account to enter the parking lot. This could be useful for companies with multiple employees.
 - We will consider other entry/exit methods like recognition of license plates on cars. But still user must have a valid account with us and license plate must be registered in our system in that account.
-- We will allow multiple pricing models based on the parking estate location, type of parking lot, time of the day, day of the week, season, etc.
+- We will allow multiple pricing models based on the parking lot location, type of parking space, time of the day, day of the week, season, etc.
 - We will allow discounts for long term users. or fixed monthly subscription which will allow users to use our parking lots without any additional charges.
 
