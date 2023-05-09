@@ -2,11 +2,11 @@
 FROM python:latest
 
 # Copy the protobuf script and requirements file into the container
-COPY requirements.txt /pip/
+COPY requirements.pylint.txt /pip/requirements.txt
 
 # Install required Python dependencies
-RUN pip install --verbose -r /pip/requirements.txt \
-    && pip install --verbose pylint
+RUN pip install --upgrade pip \
+    && pip install --verbose -r /pip/requirements.txt
 
 # Set the working directory
 WORKDIR /app

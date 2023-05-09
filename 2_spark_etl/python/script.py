@@ -5,6 +5,14 @@ from pyspark.sql.types import StringType, LongType, TimestampType, StructType, S
 
 PG_URL = "jdbc:postgresql://my_postgres:5432/main"
 
+def calculate_metrics(input_data):
+    """Calculate the metrics."""
+    return input_data \
+        .groupBy(window("timestamp", "10 minutes").alias("window"), "action") \
+        .agg(count("*").alias("count")) \
+        .select("window.start", "action", "count") \
+        .orderBy("window.start", "action")
+
 # Initialize Spark session
 print("Initializing Spark session...")
 spark = SparkSession.builder \
@@ -22,11 +30,7 @@ input_df = spark.read \
 
 # Calculate the metrics
 print("Calculating the metrics...")
-metrics_df = input_df \
-    .groupBy(window("timestamp", "10 minutes").alias("window"), "action") \
-    .agg(count("*").alias("count")) \
-    .select("window.start", "action", "count") \
-    .orderBy("window.start", "action")
+metrics_df = calculate_metrics(input_df)
 
 # Print the results
 print("Printing the results to STDOUT...")
