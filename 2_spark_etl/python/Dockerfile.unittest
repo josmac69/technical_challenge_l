@@ -1,0 +1,29 @@
+# Use the Bitnami Spark base image
+FROM bitnami/spark:3
+
+# Copy the requirements file into the container
+COPY requirements.unittest.txt /pip/requirements.txt
+
+# Install required Python dependencies
+USER root
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3-pip \
+        python3-setuptools \
+        python3-wheel && \
+    pip3 install --upgrade pip && \
+    pip3 install --verbose -r /pip/requirements.txt \
+    && rm -rf /opt/bitnami/spark/ivy-cache \
+    && mkdir -p /opt/bitnami/spark/ivy-cache/cache \
+    && chown -R 1001:1001 /opt/bitnami/spark/ivy-cache/cache
+
+# Set the working directory
+WORKDIR /app
+
+# Switch back to the bitnami user
+USER 1001
+
+ENV HADOOP_USER_NAME=root
+
+# Set the entrypoint to use the Python3 binary
+ENTRYPOINT ["python3"]

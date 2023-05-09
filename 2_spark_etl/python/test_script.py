@@ -1,13 +1,20 @@
+"""Unit tests for pyspark script"""
 import unittest
+import os
 from pyspark.sql import SparkSession
 from pyspark.sql.types import Row
 from script import calculate_metrics
 
-class TestETLSparkTask(unittest.TestCase):
+os.environ['PYSPARK_SUBMIT_ARGS'] = '--packages org.apache.spark:spark-sql_2.12:3.1.1 pyspark-shell'
+print("PYSPARK_SUBMIT_ARGS: ", os.environ['PYSPARK_SUBMIT_ARGS'])
 
+print("class TestETLSparkTask(unittest.TestCase)")
+class TestETLSparkTask(unittest.TestCase):
+    """Unit tests for pyspark script"""
     def setUp(self):
         self.spark = SparkSession.builder \
             .appName("ETLChallengeUnitTest") \
+            .config("spark.jars.ivy", "/opt/bitnami/spark/ivy-cache") \
             .master("local") \
             .getOrCreate()
         self.sample_data = [
@@ -18,9 +25,11 @@ class TestETLSparkTask(unittest.TestCase):
         ]
 
     def tearDown(self):
+        """Stop Spark session"""
         self.spark.stop()
 
     def test_calculate_metrics(self):
+        """Test calculate_metrics function"""
         input_df = self.spark.createDataFrame(self.sample_data)
         metrics_df = calculate_metrics(input_df)
 
@@ -35,4 +44,5 @@ class TestETLSparkTask(unittest.TestCase):
         self.assertTrue(expected_df.subtract(metrics_df).rdd.isEmpty())
 
 if __name__ == "__main__":
+    print("unittest.main()")
     unittest.main()

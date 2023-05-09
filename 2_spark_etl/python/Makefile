@@ -4,6 +4,7 @@
 	psql \
 	build-pylint \
 	pylint \
+	build-unittest \
 	unittest
 
 POSTGRESQL_CONTAINER=my_postgres
@@ -11,6 +12,7 @@ POSTGRESQL_USER=myuser
 POSTGRESQL_DB=main
 
 PYLINT_CONTAINER=my_pylint
+PYTHON_SCRIPT ?= script.py
 
 start:
 	docker compose up
@@ -36,11 +38,16 @@ pylint:
 	docker run \
 	-v $(PWD):/app \
 	$(PYLINT_CONTAINER) \
-	/app/script.py
+	/app/$(PYTHON_SCRIPT)
+
+build-unittest:
+	docker build --progress=plain \
+	--no-cache -t my_spark_unittest \
+	-f Dockerfile.unittest .
 
 unittest:
 	docker run -it \
 	-v $(PWD):/app \
 	-w /app \
-	bitnami/spark:3 \
-	python3 -m unittest test_script.py
+	my_spark_unittest \
+	-m unittest test_script.py
