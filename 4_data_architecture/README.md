@@ -11,58 +11,231 @@ We are managing parking lots that a client can check with a mobile app. An app c
 
 ## Solution
 
-### General overview of the solution
 The definition of the whole task is would require further discussions to understand better all the details.
-But since this is a technical challenge I will set some assumptions and provide solution based on them.
+But since this is a technical challenge I will list my assumptions and provide solution based on them.
+The whole process of designing the solution is based on the pragmatic principle - [Make it Work, Make It Right, Make It Fast](https://wiki.c2.com/?MakeItWorkMakeItRightMakeItFast)
 
+### Data model
 Data gathered by the app are very simple and relational by design.
-We need to use transactional database with strong consistency to avoid over booking of parking lots.
+We shall use transactional database with strong consistency to avoid over booking of parking lots and problems with financial transactions.
 
-### General features of the solution
-In this part I gathered just some thoughts about the solution. The whole solution is described in the next section.
-The whole process of designing the solution was based on the pragmatic principle - [Make it Work, Make It Right, Make It Fast](https://wiki.c2.com/?MakeItWorkMakeItRightMakeItFast)
+#### User master record
+Holds information about user account.
 
-1. Tracking events and data model for event analysis:
+Structure:
+* `user_id`: bigint automatically increased (bigserial) unique user identifier
+* `name`: user name
+* `email`: user main email address
+* `phone`: user main phone number
+* `payment_details`: payment details (credit card number, bank account number, etc.)
+* `currency`: currency of the account
+* `account_balance`: current account balance
+* `account_blocked`: flag indicating if account is blocked
+* `account_blocked_reason`: reason why account is blocked
+* `account_blocked_timestamp`: timestamp when account was blocked
 
-   Tracking events:
-   a. `parking_lot_state`: This event should track the current state of each parking lot (number of available spaces, total capacity).
-   b. `check_in`: This event should track when a car enters the parking lot (timestamp, user ID, parking lot ID, entry method (QR/NFC)).
-   c. `exit`: This event should track when a car leaves the parking lot (timestamp, user ID, parking lot ID, duration, amount charged).
+##### User account audit transactions:
+History of changes on user account. For analytical purposes.
 
-   Data model for event analysis:
-   We can use a star schema for event analysis, with a fact table containing the event details (event type, timestamp, user ID, parking lot ID, duration, amount charged) and dimension tables containing information about users, parking lots, and time.
+Structure:
+* `user_id`: bigint user identifier
+* `timestamp`: timestamp of the event
+* `event_type`: type of the event
+* `metadata`: additional metadata
 
-   Technologies:
-   - For PoC:
-     - We can use even a very simple architecture because frequency of data will be quite small.
-   - For more complicated use cases (see below):
-     - Apache Kafka for event streaming and processing. This allows real-time monitoring and analysis of events.
-     - More advanced data warehouse like Google BigQuery or Amazon Redshift for storing and analyzing the events data.
+Audit events:
+* `account_created`: account created, metadata contain all user data
+* `account_updated`: account updated, metadata contain changes
+* `account_deleted`: account deleted, metadata contain reason
+  * user shall receive confirmation about deletion by email or pusher notification
+  * user account can be deleted deleted for example in case of too high debt or on request for example when user dies
+  * if there are some money on the account, we shall send them back to user
+* `account_blocked`: account blocked by us, metadata contain reason
+  * account can be blocked by us for example in case of too high debt
+  * user must be informed about this by email or pusher notification
+* `account_unblocked`: account unblocked by us (timestamp, user ID, metadata)
+  * when problem is solved and we unblock account
+  * user must be informed about this by email or pusher notification
 
-2. Backend system design and data model for the operational system:
+##### User account financial transactions
+History of financial transactions on user account. For analytical purposes.
+
+Structure:
+* `financial_transaction_id`: bigint automatically increased (bigserial) unique financial transaction identifier
+* `user_id`: bigint user identifier
+* `timestamp`: timestamp of the event
+* `event_type`: type of the event
+* `metadata`: additional metadata
+* `amount`: amount of money
+* `currency`: currency of the transaction
+* `account_balance`: current account balance
+
+Financial events:
+* `usage_charged`: money charged from account due to usage of parking lot (timestamp, user ID, parking lot ID, amount charged)
+  * this event will be triggered by `exit` event
+* `account_increased`: money send to account (timestamp, user ID, amount received).
+  * this is real moment when money is added to the account - in many cases payment using card is actually delayed
+* `account_decreased`: money send from account back to user (timestamp, user ID, amount sent, metadata)
+  * special event, this could be important in case user deletes account and we need to send him money back
+  * or in case of wrong charge like double charge due to some bug in the system
+* `free_usage`: free usage of parking lot
+  * event triggered by `exit` event from parking lot and is generated for analytical purposes
+  * this could be used for example for some promotion campaigns
+  * or in case of some problems with parking lot
+  * or in case of some problems with the whole system
+  * or if there is some option to use parking lot for free for example for employees
+  * or if there is some option like first 15 minutes are free / first hour is free etc
+
+#### Parking lot master record
+Holds information about parking lot.
+
+Structure:
+* `parking_lot_id`: bigint automatically increased (bigserial) unique parking lot identifier
+* `name`: parking lot name
+* `address`: parking lot address
+* `capacity`: parking lot capacity
+* `pricing_model_id`: pricing model identifier
+* `blocked`: flag indicating if parking lot is blocked
+* `blocked_reason`: reason why parking lot is blocked
+* `blocked_timestamp`: timestamp when parking lot was blocked
+* `full`: flag indicating if parking lot is full
+* `full_timestamp`: timestamp when parking lot was full
+* `record_created`: timestamp when parking lot was created
+* `record_updated`: timestamp when parking lot master record was last time updated
+
+- Parking lot is an area designated for the parking of vehicles, usually outdoors and located near a building, shopping center, or public area.
+It typically consists of a paved surface with marked parking spaces. It's capacity is fixed and defined by the number of parking spaces.
+
+- For different use cases we can have different types of parking lots - for passenger cars, for trucks, for buses, for motorcycles, for bicycles, for disabled people etc. These will require different handling by a system.
+
+##### Parking lot master record events
+
+Structure:
+* `parking_lot_id`: bigint parking lot identifier
+* `timestamp`: timestamp of the event
+* `event_type`: type of the event
+* `metadata`: additional metadata
+* `capacity`: capacity of the parking lot after event
+
+Parking lot master record audit events:
+* `parking_lot_created`: parking lot created
+  * sets initial capacity of the parking lot
+* `parking_lot_updated`: parking lot updated
+  * updates capacity of the parking lot
+  * if there would be some limitations for example due to construction works
+  * or if capacity increases due to adding new parking spaces
+* `parking_lot_deleted`: parking lot deleted
+  * for future growth of the system, some parking lot can be sold etc - to track this for the analysis
+* `parking_lot_blocked`: parking lot blocked
+  * parking lot can be temporarily out of service due to maintenance works etc
+* `parking_lot_unblocked`: parking lot unblocked
+  * parking lot is back in service
+* `parking_lot_full`: parking lot full
+  * ? this could be useful for the analysis, requires further discussion
+
+##### Parking lot tracking events
+Tracks events on parking lot related to entry and exit of cars and connection with the system on parking lot.
+
+Structure:
+* `parking_lot_id`: bigint parking lot identifier
+* `timestamp`: timestamp of the event
+* `event_type`: type of the event
+* `metadata`: additional metadata
+  * details about event like - entry method QR/NFC
+* `capacity`: capacity of the parking lot AFTER the event
+* `financial_transaction_id`: financial transaction ID
+
+Tracking events:
+* `entry`: car enters the parking lot (timestamp, user ID, parking lot ID, entry method (QR/NFC), financial transaction id)
+  * even entry can trigger financial transaction in some cases - both decrease and increase
+* `entry_refused`: when a user is denied entry to the parking lot or exit due to an invalid or deleted or blocked account (timestamp, user ID, parking lot ID, entry method (QR/NFC), metadata)
+  * this event will not trigger financial transaction
+  * entry gate display shall inform user about the reason of refusal
+  * user must later receive detailed information by email or pusher notification into the app
+* `exit`: car leaves the parking lot (timestamp, user ID, parking lot ID, duration, financial transaction id)
+  * for common users this event will always trigger financial transaction
+  * unless there will be some special cases like free parking for first 15 minutes / first 1 hour etc or free parking in case of some special events
+* `connection_lost`: generated by main system when internet/network connection is lost
+  * will require some heartbeat mechanism to detect this
+* `connection_restored`: generated by main system when internet/network connection is restored
+  * will require some heartbeat mechanism to detect this
+
+- Even with hundreds of parking spaces available on one parking lot, frequency of events for one specific parking lot is actually quite small. Only a few events per minute for one parking lot. Frequency will be limited by capacity of entrance/exit gates. How many cars can enter/exit parking lot per minute. Many parking lots in real life can just 1 entry and 1 exit gate. Sometimes with 2 lanes, very rarely with more lines.
+  - Frequency of events can grow only in case we start managing multiple parking lots.
+
+- Data will be highly seasonal, with peaks during rush hours and in case of sales, Black Friday, days before Christmas etc. But even in this scope frequency of events is still quite small because we are still limited by capacity of gates.
+
+- Cars stay in the parking lot for quite a long time - dozens of minutes or hours. Shorter stays are not common.
+
+#### Pricing model master record
+Holds information about pricing model.
+One pricing model can be used for multiple parking lots if future versions.
+
+Price calculation will be encapsulated in a separate part of service and can be developed and improved independently.
+
+- Dynamic pricing model is required for common users.
+  - Price will depend on the current state of the parking lot - number of available spaces.
+  - The price will be higher when the parking lot is almost full and lower when the parking lot is almost empty.
+  - One possible way of implementing price could be for example: `price = base_price * (1 + (total_capacity - available_spaces) / total_capacity)`.
+- For long term users we can use a different price model. For example, we can offer a monthly subscription with a fixed price or discounts from normal price.
+
+- Pricing model relates to the execution of payments.
+  - For new comers we can require to charge money in advance to be able to use our parking lots. Or we can subtract money from their electronic wallet associated with our account.
+  - For long term users or for companies we can allow to pay after the fact. Account will accumulate required amount and system will send them an invoice at the end of the month.
+
+- There could be some promotions / special occasions when parking would be free of charge. For example, free parking for first 15 minutes or first 1 hour. Or free parking in case of some special events.
+
+This part would require further discussion. Because business requirements are not clear.
+
+Open questions:
+* In which moment we calculate price for parking lot usage?
+  * User should now the price before entering the parking lot to be able to decide if he wants to use it or not.
+  * If he stays for longer time and price decreases during his stay, will we charge him the lower price for remaining time?
+  * We cannot charge him higher price for remaining time because this would be unfair and would discourage users from using the parking lot.
+* Is it possible to have multiple pricing models for one parking lot?
+
+Assumptions:
+* To be able to implement some pricing model I assume that:
+  * I will presume one price for parking lot usage for current hour for all users.
+    * Price will be re-calculated based on current capacity of the parking lot every 15 minutes.
+  * Standard way of calculating price for parking lot usage is to calculate price per hour so I will use this approach.
+  * User is charged for every started hour of parking lot usage.
+    * I will generate `usage_charged` event every hour for every user that is still in the parking lot.
+    * For maintaining good relationship with users, there should be some time interval in the next hour when user can leave the parking lot without being charged for the next hour. For the sake of this PoC I assume that this interval is 5 minutes.
+      * I.e. charging event will be generated every 6th minute of the hour.
+  * Maximal price user can be charged per hour is price he received when entering the parking lot.
+  * For maintaining good relationship with users, user will be charged less in next hours when price decreases due to more free parking spaces available.
+
+Structure:
+* `pricing_model_id`: bigint automatically increased (bigserial) unique pricing model identifier
+* `name`: pricing model short name for internal use
+* `description`: pricing model detailed description
+*
+
+
+### Technologies:
+- For PoC:
+  - We can use even a very simple architecture because frequency of data will be quite small.
+- For more complicated use cases (see below):
+  - Apache Kafka for event streaming and processing. This allows real-time monitoring and analysis of events.
+  - More advanced data warehouse like Google BigQuery or Amazon Redshift for storing and analyzing the events data.
+
+1. Backend system design and data model for the operational system:
 
    Backend system design:
-   - Use a RESTful API built with a web framework like Django, Flask, or Express.js for handling user requests. ?
+   - Use a RESTful API built with a web framework like Django, Flask, or Express.js for handling user requests.
    - Use a relational database like PostgreSQL, MySQL, or MariaDB for storing user information and parking lot state.
       - Based on my previous experiences I would recommend PostgreSQL. Since it have very mature both OLTP and OLAP capabilities.
-
-   Data model for the operational system:
-   - Users table:
-     - Stores user information - user ID, name, email, payment information
-   - Parking lots table:
-     - stores parking lot information - parking lot ID, location, capacity, current available spaces, pricing model ?
-   - Transactions table:
-     - stores information about each transaction - transaction ID, user ID, parking lot ID, entry time, exit time, amount charged ?
 
    Technologies:
    - For the API: Django, Flask, or Express.js. ?
    - For the database: PostgreSQL
 
-3. Combining operational and analytical architectures:
+2. Combining operational and analytical architectures:
 
    Apache NiFi or AWS Glue?
 
-4. Development lifecycle, test, and deployment automation:
+3. Development lifecycle, test, and deployment automation:
 
    - Development lifecycle:
      - Agile methodologies like Scrum or Kanban for iterative development and continuous improvement will be used.
@@ -81,38 +254,12 @@ The whole process of designing the solution was based on the pragmatic principle
      - The performance and health of the whole system will be monitored using Prometheus, Alertmanager and Grafana.
      - Different alerts and warnings will be set to notify the team of any issues.
 
-#### Implementation of the solution
+## Implementation of the solution
 
 Based on pragmatic principle mentioned above, I will first discuss a PoC (Proof of Concept) solution. This PoC will be a simple solution that will be able to handle the most basic use cases. After that, I will iterate over the PoC and improve it by adding new features and extending the functionality for handling more complex use cases.
 
-##### Analysis
-
-###### System overview
-- Parking lot is an area designated for the parking of vehicles, usually outdoors and located near a building, shopping center, or public area.
-It typically consists of a paved surface with marked parking spaces. It's capacity is fixed and defined by the number of parking spaces.
-- Even with hundreds of parking spaces available on one parking lot, frequency of events for one specific parking lot is actually quite small. Only a few events per minute for one parking lot. Frequency will be limited by capacity of entrance/exit gates. How many cars can enter/exit parking lot per minute. Many parking lots in real life can just 1 entry and 1 exit gate. Sometimes with 2 lanes, very rarely with more lines.
-  - Frequency of events can grow only in case we start managing multiple parking lots.
-- Data will be highly seasonal, with peaks during rush hours and in case of sales, Black Friday, days before Christmas etc. But even in this scope frequency of events is still quite small because we are still limited by capacity of gates.
-- Cars stay in the parking lot for quite a long time - dozens of minutes or hours. Shorter stays are not common.
-- For different use cases we can have different types of parking lots - for passenger cars, for trucks, for buses, for motorcycles, for bicycles, for disabled people etc. These will require different handling by a system.
-
-###### Pricing model
-Price calculation will be encapsulated in a separate part of service and can be developed and improved independently.
-- Dynamic pricing model is required for common users.
-  - Price will depend on the current state of the parking lot - number of available spaces.
-  - The price will be higher when the parking lot is almost full and lower when the parking lot is almost empty.
-  - One possible way of implementing price could be for example: `price = base_price * (1 + (total_capacity - available_spaces) / total_capacity)`.
-- For long term users we can use a different price model. For example, we can offer a monthly subscription with a fixed price or discounts from normal price.
-
-- Pricing model relates to the execution of payments.
-  - For new comers we can require to charge money in advance to be able to use our parking lots. Or we can subtract money from their electronic wallet associated with our account.
-  - For long term users or for companies we can allow to pay after the fact. Account will accumulate required amount and system will send them an invoice at the end of the month.
-
-###### Authentication
-
-
-##### Technical overview
-**Mobile app**
+### Technical overview
+#### Mobile app
 Mobile app must handle the following tasks:
 * Creation / update / deletion of user account
 * Show QR code for user account for entering / exiting parking lot. Content of QR code should be not trivial to prevent frauds.
@@ -122,8 +269,9 @@ Mobile app must handle the following tasks:
 * Show details of selected parking lot including indication of frequency of current traffic on parking lot and prediction of available spaces in the next 30 minutes/1 hour.
 * Mobile app must indicate if there is a problem with network connection on specific parking lot and must indicate that system works offline and therefore app cannot show current state of parking lot.
 
-**Parking lot devices**
+#### Parking lot devices
 Technical devices stationary on parking lot must be able to handle the following tasks:
+* Entry gate must be able to show Green light if new car can enter parking lot or Red light if car cannot enter parking lot because it is full.
 * Scan QR and validate if user can enter parking lot - i.e. if user has a valid account and if user has enough money on his account to be able to enter parking lot or has payment model which allows him to enter parking lot due to subscription or "pay after the fact" model.
   * System must be able to handle cases when user has no internet connection and must be able to validate user account locally.
 * Entry/exit gate must be able to recognize if car is present to prevent frauds.
