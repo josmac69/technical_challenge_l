@@ -25,13 +25,15 @@ Only one record per user_id exists.
 Master record will be updated during financial transactions and manual user account updates.
 Table will be indexed by user_id.
 Table will most likely not be partitioned.
+Record will be locked during update.
 
 Structure:
 * `user_id`: bigint automatically increased (bigserial) unique user identifier
-* `name`: user name
-* `email`: user main email address
-* `phone`: user main phone number
-* `payment_details`: payment details (credit card number, bank account number, etc.)
+* `name`: user name - required
+* `email`: user main email address - required
+* `email_verified`: flag indicating if email address is verified
+* `phone`: user main phone number - required, can be read from mobile phone where app runs, can be used for SMS notifications
+* `payment_details_key`: text value - key to payment details record in the third party system
 * `currency`: currency of the account
 * `account_balance`: current account balance
 * `account_blocked`: flag indicating if account is blocked
@@ -40,9 +42,12 @@ Structure:
 * `created_at`: timestamp when account was created
 * `updated_at`: timestamp when account was updated
 
+Payment details are stored in the third party system and are referenced by key. This is to avoid storing sensitive data in our system.
+Details are not discussed in this document. Since I presume this part would require security and privacy audit which is out of scope of this document.
+
 ##### User account audit transactions:
 History of changes on user account. For analytical purposes.
-Data are only appended to the table, no updates or deletes are allowed.
+Data are only appended to the table, no updates or deletes are allowed. So no locking is required.
 Table will be indexed by user_id, timestamp and event_type.
 Table will most likely be partitioned by date (timestamp rounded to full date).
 
@@ -54,6 +59,7 @@ Structure:
 
 Audit events:
 * `account_created`: account created, metadata contain all user data
+* `email_verified`: email address verified - set email_verified flag to true in user master record
 * `account_updated`: account updated, metadata contain changes
 * `account_deleted`: account deleted, metadata contain reason
   * user shall receive confirmation about deletion by email or pusher notification
@@ -82,10 +88,9 @@ Audit events:
 
 ##### User account financial transactions
 History of financial transactions on user account. For analytical purposes.
-Data are only appended to the table, no updates or deletes are allowed.
+Data are only appended to the table, no updates or deletes are allowed. So no locking is required.
 Table will be indexed by user_id, financial_transaction_id, timestamp and event_type.
 Table will most likely be partitioned by date (timestamp rounded to full date).
-
 
 Structure:
 * `financial_transaction_id`: bigint automatically increased (bigserial) unique financial transaction identifier
@@ -119,6 +124,7 @@ Only one record per parking lot exists.
 Master record will be updated mainly during entry/exit events and also during manual parking lot updates.
 Table will be indexed by parking_lot_id.
 Table will most likely not be partitioned.
+Record will locked during updates.
 
 Structure:
 * `parking_lot_id`: bigint automatically increased (bigserial) unique parking lot identifier
@@ -141,7 +147,7 @@ It typically consists of a paved surface with marked parking spaces. It's capaci
 
 ##### Parking lot master record audit events
 Table contains history of changes on parking lot master record.
-Data are only appended to the table, no updates or deletes are allowed.
+Data are only appended to the table, no updates or deletes are allowed. So no locking is required.
 Table will be indexed by parking_lot_id, timestamp and event_type.
 Table will most likely be partitioned by date (timestamp rounded to full date).
 
@@ -172,7 +178,7 @@ Parking lot master record audit events:
 
 ##### Parking lot tracking events
 Tracks events on parking lot related to entry and exit of cars and connection with the system on parking lot.
-Data are only appended to the table, no updates or deletes are allowed.
+Data are only appended to the table, no updates or deletes are allowed. So no locking is required.
 Table will be indexed by parking_lot_id, user_id, timestamp and event_type.
 Table will most likely be partitioned by date (timestamp rounded to full date).
 
@@ -211,6 +217,7 @@ Tracking events:
 #### Pricing model master record
 Holds information about pricing model.
 One pricing model can be used for multiple parking lots if future versions.
+Record will be locked during update.
 
 Price calculation will be encapsulated in a separate part of service and can be developed and improved independently.
 
@@ -246,12 +253,22 @@ Assumptions:
       * I.e. charging event will be generated every 6th minute of the hour.
   * Maximal price user can be charged per hour is price he received when entering the parking lot.
   * For maintaining good relationship with users, user will be charged less in next hours when price decreases due to more free parking spaces available.
+* For the purpose of this technical challenge I presume very naive approach to pricing model. But since parameters of pricing model are stored in JSON format, it will be possible to relatively easily implement more complex pricing models in the future.
 
 Structure:
 * `pricing_model_id`: bigint automatically increased (bigserial) unique pricing model identifier
 * `name`: pricing model short name for internal use
 * `description`: pricing model detailed description
-* `price`: price per hour
+* `basic_rate_price`: lowest price per hour for parking lot usage in this pricing model
+* `current_rate_price`: always contains current price per hour for parking lot usage in this pricing model
+* `peak_rate_price`: highest price per hour for parking lot usage in this pricing model - null when unlimited or not applicable
+* `pricing_model_parameters`: JSON data describing changes in price over time -  null if price should not be recalculated
+  * `type`: type of the pricing model - `dynamic` or `static`
+  * dynamic pricing model:
+    * `periodicity`: how often price should be recalculated in minutes - 15 minutes by default
+    * `formula`: formula for calculating price based on current capacity of the parking lot
+  * static pricing model:
+    * `hours`: for static model only - array of `hour` and `price` pairs - price for specific hour of the day
 * `currency`: currency of the price
 * `created_at`: timestamp of the creation of the pricing model
 * `updated_at`: timestamp of the last update of the pricing model
@@ -263,6 +280,7 @@ Only one record per user and parking lot can exist at the same time.
 Table will be indexed by user_id and parking_lot_id.
 Table will not be partitioned because it will be small.
 Rules for updating records are listed in assumptions.
+Record will be locked during updates.
 
 Structure:
 * `user_id`: bigint unique user identifier
@@ -283,7 +301,7 @@ Assumptions:
 ##### Price per user and parking lot auditing events
 Holds information about price changes for specific user and parking lot.
 Records are created when user enters parking lot or price decreases.
-Records are only added, never updated or deleted.
+Records are only added, never updated or deleted. So no locking is required.
 Table will be indexed by user_id and parking_lot_id.
 Table will be partitioned by date (rounded timestamp to day).
 
@@ -296,7 +314,8 @@ Structure:
 
 ### Technologies:
 - For PoC:
-  - We can use even a very simple architecture because frequency of data will be quite small.
+  - We can use a very simple architecture because frequency of data will be quite small.
+
 - For more complicated use cases (see below):
   - Apache Kafka for event streaming and processing. This allows real-time monitoring and analysis of events.
   - More advanced data warehouse like Google BigQuery or Amazon Redshift for storing and analyzing the events data.
@@ -306,7 +325,7 @@ Structure:
    Backend system design:
    - Use a RESTful API built with a web framework like Django, Flask, or Express.js for handling user requests.
    - Use a relational database like PostgreSQL, MySQL, or MariaDB for storing user information and parking lot state.
-      - Based on my previous experiences I would recommend PostgreSQL. Since it have very mature both OLTP and OLAP capabilities.
+      - Based on my previous experiences I would recommend PostgreSQL. Since it has very mature both OLTP and OLAP capabilities.
 
    Technologies:
    - For the API: Django, Flask, or Express.js. ?
@@ -314,7 +333,12 @@ Structure:
 
 2. Combining operational and analytical architectures:
 
-   Apache NiFi or AWS Glue?
+  - Live system needs to just see data for the current day and maybe previous day - for cases when user enters the parking lot in the evening and leaves in the morning.
+  - Older audit data can be archived to a data warehouse for data analysis.
+  - For the PoC we presume copying the whole yesterday's partition to the data warehouse every day.
+  - If necessary we can implement incremental updates of the data warehouse over the day for the current day.
+  - Master records which will could be repeatedly updated will be stored in the operational database.
+  - Analytical system needs to see data for the whole history, today could be questionable.
 
 3. Development lifecycle, test, and deployment automation:
 
