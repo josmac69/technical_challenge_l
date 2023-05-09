@@ -21,6 +21,10 @@ We shall use transactional database with strong consistency to avoid over bookin
 
 #### User master record
 Holds information about user account.
+Only one record per user_id exists.
+Master record will be updated during financial transactions and manual user account updates.
+Table will be indexed by user_id.
+Table will most likely not be partitioned.
 
 Structure:
 * `user_id`: bigint automatically increased (bigserial) unique user identifier
@@ -33,9 +37,14 @@ Structure:
 * `account_blocked`: flag indicating if account is blocked
 * `account_blocked_reason`: reason why account is blocked
 * `account_blocked_timestamp`: timestamp when account was blocked
+* `created_at`: timestamp when account was created
+* `updated_at`: timestamp when account was updated
 
 ##### User account audit transactions:
 History of changes on user account. For analytical purposes.
+Data are only appended to the table, no updates or deletes are allowed.
+Table will be indexed by user_id, timestamp and event_type.
+Table will most likely be partitioned by date (timestamp rounded to full date).
 
 Structure:
 * `user_id`: bigint user identifier
@@ -56,9 +65,27 @@ Audit events:
 * `account_unblocked`: account unblocked by us (timestamp, user ID, metadata)
   * when problem is solved and we unblock account
   * user must be informed about this by email or pusher notification
+* `user_checks_availability`: user checks availability of parking lot
+  * this event will be triggered by user in mobile app
+  * this event will be used for analytical purposes
+  * this event will be used for predictive model
+    * the event will help us understand for example how long before arriving at the parking lot the user usually checks if it is free
+    * by amount of checks by all users in the current period of time we can predict availability of parking spaces in the near future
+    * we can also inform users about frequency of checks from other users
+* ? `booking`: for the future versions - user books parking space on parking lot
+  * this event will be triggered by user in mobile app
+  * this event will be used for analytical purposes
+  * this event will be used for predictive model
+    * the event will help us understand for example how long before arriving at the parking lot the user usually books it
+    * by amount of bookings by all users in the current period of time we can predict availability of parking spaces in the near future
+    * we can also inform users about frequency of bookings from other users
 
 ##### User account financial transactions
 History of financial transactions on user account. For analytical purposes.
+Data are only appended to the table, no updates or deletes are allowed.
+Table will be indexed by user_id, financial_transaction_id, timestamp and event_type.
+Table will most likely be partitioned by date (timestamp rounded to full date).
+
 
 Structure:
 * `financial_transaction_id`: bigint automatically increased (bigserial) unique financial transaction identifier
@@ -88,6 +115,10 @@ Financial events:
 
 #### Parking lot master record
 Holds information about parking lot.
+Only one record per parking lot exists.
+Master record will be updated mainly during entry/exit events and also during manual parking lot updates.
+Table will be indexed by parking_lot_id.
+Table will most likely not be partitioned.
 
 Structure:
 * `parking_lot_id`: bigint automatically increased (bigserial) unique parking lot identifier
@@ -100,15 +131,19 @@ Structure:
 * `blocked_timestamp`: timestamp when parking lot was blocked
 * `full`: flag indicating if parking lot is full
 * `full_timestamp`: timestamp when parking lot was full
-* `record_created`: timestamp when parking lot was created
-* `record_updated`: timestamp when parking lot master record was last time updated
+* `created_at`: timestamp when parking lot was created
+* `updated_at`: timestamp when parking lot master record was last time updated
 
 - Parking lot is an area designated for the parking of vehicles, usually outdoors and located near a building, shopping center, or public area.
 It typically consists of a paved surface with marked parking spaces. It's capacity is fixed and defined by the number of parking spaces.
 
 - For different use cases we can have different types of parking lots - for passenger cars, for trucks, for buses, for motorcycles, for bicycles, for disabled people etc. These will require different handling by a system.
 
-##### Parking lot master record events
+##### Parking lot master record audit events
+Table contains history of changes on parking lot master record.
+Data are only appended to the table, no updates or deletes are allowed.
+Table will be indexed by parking_lot_id, timestamp and event_type.
+Table will most likely be partitioned by date (timestamp rounded to full date).
 
 Structure:
 * `parking_lot_id`: bigint parking lot identifier
@@ -132,12 +167,18 @@ Parking lot master record audit events:
   * parking lot is back in service
 * `parking_lot_full`: parking lot full
   * ? this could be useful for the analysis, requires further discussion
+* `parking_lot_revenue`: parking lot revenue per day
+  * ? this could be useful for the analysis, requires further discussion
 
 ##### Parking lot tracking events
 Tracks events on parking lot related to entry and exit of cars and connection with the system on parking lot.
+Data are only appended to the table, no updates or deletes are allowed.
+Table will be indexed by parking_lot_id, user_id, timestamp and event_type.
+Table will most likely be partitioned by date (timestamp rounded to full date).
 
 Structure:
 * `parking_lot_id`: bigint parking lot identifier
+* `user_id`: bigint user identifier
 * `timestamp`: timestamp of the event
 * `event_type`: type of the event
 * `metadata`: additional metadata
@@ -210,8 +251,48 @@ Structure:
 * `pricing_model_id`: bigint automatically increased (bigserial) unique pricing model identifier
 * `name`: pricing model short name for internal use
 * `description`: pricing model detailed description
-*
+* `price`: price per hour
+* `currency`: currency of the price
+* `created_at`: timestamp of the creation of the pricing model
+* `updated_at`: timestamp of the last update of the pricing model
 
+#### Price per user and parking lot
+Holds information about current price for specific user and parking lot.
+Records exists only when user is currently in the parking lot.
+Only one record per user and parking lot can exist at the same time.
+Table will be indexed by user_id and parking_lot_id.
+Table will not be partitioned because it will be small.
+Rules for updating records are listed in assumptions.
+
+Structure:
+* `user_id`: bigint unique user identifier
+* `parking_lot_id`: bigint unique parking lot identifier
+* `pricing_model_id`: bigint unique pricing model identifier
+* `price`: price per hour
+* `currency`: currency of the price
+* `created_at`: timestamp of the creation of the price
+* `updated_at`: timestamp of the last update of the price
+
+Assumptions:
+* Record is created when user enters the parking lot and is updated when price decreases due to more free parking spaces available.
+* Price is never increased.
+* Record is deleted when user leaves the parking lot.
+* Price stored in this table is used for charging user for parking lot usage for current hour.
+* Changes are recorded in audit table.
+
+##### Price per user and parking lot auditing events
+Holds information about price changes for specific user and parking lot.
+Records are created when user enters parking lot or price decreases.
+Records are only added, never updated or deleted.
+Table will be indexed by user_id and parking_lot_id.
+Table will be partitioned by date (rounded timestamp to day).
+
+Structure:
+* `user_id`: bigint unique user identifier
+* `parking_lot_id`: bigint unique parking lot identifier
+* `timestamp`: timestamp of the price change
+* `price`: price per hour
+* `currency`: currency of the price
 
 ### Technologies:
 - For PoC:
