@@ -1,4 +1,10 @@
-.PHONY: start_postgres run_task1 run_task2 run_task3
+.PHONY: start_postgres \
+	stop_postgres \
+	run_psql \
+	run_bash \
+	run_task1 \
+	run_task2 \
+	run_task3
 
 POSTGRESQL_CONTAINER=my_postgres
 POSTGRESQL_USER=myuser
