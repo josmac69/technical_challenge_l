@@ -1,9 +1,13 @@
+"""Python script to find two integers in an array that sum to a target value."""
 import argparse
 import ast
 from typing import List, Tuple
 
 
-def two_sum(arr: List[int], target: int, verbose: bool = False) -> List[Tuple[Tuple[int, int], Tuple[int, int]]]:
+def two_sum(arr: List[int],
+            target: int,
+            verbose: bool = False) -> List[Tuple[Tuple[int, int], Tuple[int, int]]]:
+    """Find two integers in an array that sum to a target value."""
     hashmap = {}
     result = []
 
@@ -24,11 +28,17 @@ def two_sum(arr: List[int], target: int, verbose: bool = False) -> List[Tuple[Tu
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Find two integers in an array that sum to a target value.")
-    parser.add_argument('--target', type=int, default=10, help="Target sum value (default: 10)")
-    parser.add_argument('--verbose', action='store_true', help="Display detailed debug messages (default: False)")
-    parser.add_argument('--array', type=str, default="[2, 7, 11, 15, -3, 8, 3, 1, 0, -1, 7, 2]",
-                        help="Input string formatted as array of integers (default: [2, 7, 11, 15, -3, 8, 3, 1, 0, -1, 7, 2])")
+    """Main function"""
+    parser = argparse.ArgumentParser(
+        description="Find two integers in an array that sum to a target value.")
+    parser.add_argument('--target', type=int, default=10,
+                        help="Target sum value (default: 10)")
+    parser.add_argument('--verbose', action='store_true',
+                        help="Display detailed debug messages (default: False)")
+    parser.add_argument('--array', type=str,
+                        default="[2, 7, 11, 15, -3, 8, 3, 1, 0, -1, 7, 2]",
+                        help="""Input string formatted as array of integers
+                        (default: [2, 7, 11, 15, -3, 8, 3, 1, 0, -1, 7, 2])""")
 
     args = parser.parse_args()
 
@@ -46,8 +56,8 @@ def main():
         arr = ast.literal_eval(args.array)
         if not isinstance(arr, list) or not all(isinstance(x, int) for x in arr):
             raise ValueError("Array should be a list of integers.")
-    except (ValueError, SyntaxError) as e:
-        print(f"Error parsing array: {e}")
+    except (ValueError, SyntaxError) as error_msg:
+        print(f"Error parsing array: {error_msg}")
         return
 
     solutions = two_sum(arr, target, verbose)

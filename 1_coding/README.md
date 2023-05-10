@@ -37,12 +37,20 @@ options:
   * verbose True/False.
   * The function returns a list of tuples with indices of elements which sum to the target value. If there are no solutions, the function returns an empty list.
 
+### Makefile
+* Makefile contains following commands:
+  * `make pylint` - run pylint for the script
+  * `make pylint SCRIPT=test_script.py` - run pylint for the unit test script
+  * `make run` - run the script with default parameters
+  * `make run ARGS="--target 6 --verbose --array='[1,1,1,5,-1,7]'"` - run the script with custom parameters
+  * `make unittest` - run unit tests
+
 ### Discussion of huge data sets
-Regarding the case where the data does not fit in memory, you can consider the following solution:
+Regarding the case where the data does not fit in memory, we can consider some of the following solutions:
 
-Use an external sorting algorithm (such as merge sort) to sort the data on disk. You can sort the data in chunks that fit in memory and merge those sorted chunks into a single sorted file.
+* We can external sorting algorithm (such as merge sort) to sort the data on disk. It can sort the data in chunks that fit in memory and merge those sorted chunks into a single sorted file.
 
-Once the data is sorted, perform a two-pointer approach to find the two elements that sum to the target value. Read the first and last elements of the sorted file, and if their sum is greater than the target, move the pointer at the end backward. If their sum is less than the target, move the pointer at the beginning forward. Repeat until you find a pair of elements that add up to the target value.
+* Once the data is sorted, perform a two-pointer approach to find the two elements that sum to the target value. Read the first and last elements of the sorted file, and if their sum is greater than the target, move the pointer at the end backward. If their sum is less than the target, move the pointer at the beginning forward. Repeat until you find a pair of elements that add up to the target value.
 
-To find all possible solutions, you can keep iterating in a similar manner, keeping track of the pairs of elements that add up to the target value.
+* To find all possible solutions, you can keep iterating in a similar manner, keeping track of the pairs of elements that add up to the target value.
 
