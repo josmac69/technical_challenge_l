@@ -2,6 +2,7 @@
 
 SELECT
     price_tier,
+    COUNT(product_id) as products,
     SUM(clicks) AS clicks,
     SUM(impressions) AS impressions,
     CASE WHEN SUM(impressions) = 0 THEN 0
@@ -14,10 +15,10 @@ FROM (
         SUM(CASE WHEN click THEN 1 ELSE 0 END) AS clicks,
         SUM(CASE WHEN click THEN 0 ELSE 1 END) AS impressions,
         CASE
-            WHEN price BETWEEN 0 AND 5 THEN '0-5'
-            WHEN price BETWEEN 6 AND 10 THEN '5-10'
-            WHEN price BETWEEN 11 AND 15 THEN '10-15'
-            ELSE '>15'
+            WHEN price BETWEEN 0 AND 5 THEN '1. 0-5'
+            WHEN price BETWEEN 6 AND 10 THEN '2. 5-10'
+            WHEN price BETWEEN 11 AND 15 THEN '3. 10-15'
+            ELSE '4. >15'
         END AS price_tier
     FROM public.impressions
     JOIN public.products USING (product_id)

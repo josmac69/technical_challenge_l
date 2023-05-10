@@ -29,4 +29,14 @@ PURCHASES
 3. Click-through-rate by price tier (0-5, 5-10, 10-15, >15)
 
 ## Solution
-
+* I used PostgreSQL database running in Docker container.
+* Using the example above, I generated code and data for the tables.
+* I created also SQL queries for the tasks.
+* All commands are wrapped in Makefile - usage:
+  * `make start_postgres` - start PostgreSQL database in Docker container
+  * `make stop_postgres` - stop PostgreSQL database in Docker container
+  * `make run_psql` - run PostgreSQL client in Docker container in terminal in interactive mode for manual queries
+  * `make run_bash` - run bash shell in Docker container in terminal in interactive mode for manual checks if necessary
+  * `make run_task1` - run SQL query for task 1 and print results
+  * `make run_task2` - run SQL query for task 2 and print results
+  * `make run_task3` - run SQL query for task 3 and print results

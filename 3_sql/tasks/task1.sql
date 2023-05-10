@@ -2,7 +2,7 @@
 
 SELECT
     product_id,
-    date_trunc('month', date) AS month,
+    date_trunc('month', date)::date AS month,
     SUM(CASE WHEN click THEN 1 ELSE 0 END) AS clicks,
     SUM(CASE WHEN click THEN 0 ELSE 1 END) AS impressions,
     CASE WHEN SUM(CASE WHEN click THEN 0 ELSE 1 END) = 0 THEN 0
@@ -11,5 +11,8 @@ SELECT
 FROM public.impressions
 GROUP BY
     product_id,
-    month;
+    month
+ORDER BY
+    month,
+    product_id;
 
