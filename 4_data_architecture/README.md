@@ -364,13 +364,15 @@ Structure:
 * `price`: price per hour
 * `currency`: currency of the price
 * `created_at`: timestamp of the creation of the price
+* `created_by`: ID of the user / system who created the price
 * `updated_at`: timestamp of the last update of the price
+* `updated_by`: ID of the user / system who last updated the price
 
 Assumptions:
 * Record is created when user enters the parking lot and is updated when price decreases due to more free parking spaces available.
-* Price is never increased.
-* Record is deleted when user leaves the parking lot.
-* Price stored in this table is used for charging user for parking lot usage for current hour.
+* Price is never increased. Maximal price user can be charged per hour is price he received when entering the parking lot.
+* Record is deleted when user leaves the parking lot and is charged for his stay.
+* Price stored in this table is used for charging user for parking lot usage for current charging period.
 * Changes are recorded in audit table.
 
 ##### Price per user and parking lot auditing events
@@ -379,13 +381,17 @@ Overview:
 * Records are created when user enters parking lot or price decreases.
 * Records are only added, never updated or deleted. So no locking is required.
 * Table will be indexed by user_id and parking_lot_id.
-* Table will be partitioned by date (rounded timestamp to day).
+* Table will be partitioned by date (rounded event_timestamp to day).
 
 Structure:
 * `audit_id`: integer automatically increased (serial) unique audit identifier
+* `event_timestamp`: timestamp of the price change
+* `event_type`: type of the event
+* `price_id`: integer unique price identifier
 * `user_id`: integer unique user identifier
 * `parking_lot_id`: integer unique parking lot identifier
-* `event_timestamp`: timestamp of the price change
+* `pricing_model_id`: integer unique pricing model identifier
+* `tracking_event_id`: integer tracking event identifier - id of entry event for this user and parking lot
 * `price`: price per hour
 * `currency`: currency of the price
 * `metadata`: JSON data with additional information about the event

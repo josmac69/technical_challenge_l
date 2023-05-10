@@ -267,6 +267,70 @@ AFTER INSERT OR UPDATE OR DELETE ON pricing_model
 FOR EACH ROW
 EXECUTE FUNCTION pricing_model_audit_trigger_func();
 
+-- Create the user_parking_lot_price table
+CREATE TABLE user_parking_lot_price (
+  price_id serial PRIMARY KEY,
+  user_id integer NOT NULL,
+  parking_lot_id integer NOT NULL,
+  pricing_model_id integer NOT NULL,
+  tracking_event_id integer NOT NULL,
+  price numeric(10, 2) NOT NULL,
+  currency varchar(3) NOT NULL,
+  created_at timestamp NOT NULL,
+  created_by integer NOT NULL,
+  updated_at timestamp,
+  updated_by integer
+);
+
+-- Create indexes
+CREATE INDEX idx_user_parking_lot_price_user_id ON user_parking_lot_price (user_id);
+CREATE INDEX idx_user_parking_lot_price_parking_lot_id ON user_parking_lot_price (parking_lot_id);
+
+-- Create the user_parking_lot_price_audit table
+-- Create the user_parking_lot_price_audit table
+CREATE TABLE user_parking_lot_price_audit (
+  audit_id serial PRIMARY KEY,
+  event_timestamp timestamp NOT NULL,
+  event_type varchar(64) NOT NULL,
+  price_id integer NOT NULL,
+  user_id integer NOT NULL,
+  parking_lot_id integer NOT NULL,
+  pricing_model_id integer NOT NULL,
+  tracking_event_id integer NOT NULL,
+  price numeric(10, 2) NOT NULL,
+  currency varchar(3) NOT NULL,
+  metadata json
+);
+
+-- Create indexes
+CREATE INDEX idx_user_parking_lot_price_audit_user_id ON user_parking_lot_price_audit (user_id);
+CREATE INDEX idx_user_parking_lot_price_audit_parking_lot_id ON user_parking_lot_price_audit (parking_lot_id);
+
+-- Create the trigger function for user_parking_lot_price
+CREATE OR REPLACE FUNCTION audit_user_parking_lot_price()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF (TG_OP = 'INSERT') THEN
+    INSERT INTO user_parking_lot_price_audit (event_timestamp, event_type, price_id, user_id, parking_lot_id, pricing_model_id, tracking_event_id, price, currency, metadata)
+    VALUES (NOW(), 'entry', NEW.price_id, NEW.user_id, NEW.parking_lot_id, NEW.pricing_model_id, NEW.tracking_event_id, NEW.price, NEW.currency, NULL);
+  ELSIF (TG_OP = 'UPDATE') THEN
+    INSERT INTO user_parking_lot_price_audit (event_timestamp, event_type, price_id, user_id, parking_lot_id, pricing_model_id, tracking_event_id, price, currency, metadata)
+    VALUES (NOW(), 'price_changed', NEW.price_id, NEW.user_id, NEW.parking_lot_id, NEW.pricing_model_id, NEW.tracking_event_id, NEW.price, NEW.currency, NULL);
+  ELSIF (TG_OP = 'DELETE') THEN
+    INSERT INTO user_parking_lot_price_audit (event_timestamp, event_type, price_id, user_id, parking_lot_id, pricing_model_id, tracking_event_id, price, currency, metadata)
+    VALUES (NOW(), 'exit', OLD.price_id, OLD.user_id, OLD.parking_lot_id, OLD.pricing_model_id, OLD.tracking_event_id, OLD.price, OLD.currency, NULL);
+  END IF;
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create the trigger for user_parking_lot_price
+CREATE TRIGGER trg_audit_user_parking_lot_price
+AFTER INSERT OR UPDATE OR DELETE ON user_parking_lot_price
+FOR EACH ROW
+EXECUTE FUNCTION audit_user_parking_lot_price();
+
 
 -- Insert 10 different users into the user_account table
 INSERT INTO user_account (
