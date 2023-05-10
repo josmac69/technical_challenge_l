@@ -160,7 +160,7 @@ Structure:
 * `blocked`: flag indicating if parking lot is blocked
 * `blocked_reason`: reason why parking lot is blocked
 * `blocked_timestamp`: timestamp when parking lot was blocked
-* `full`: flag indicating if parking lot is full
+* `parking_lot_full`: flag indicating if parking lot is full
 * `full_timestamp`: timestamp when parking lot was full
 * `created_at`: timestamp when parking lot was created
 * `created_by`: identifier of the user / system who created the record
@@ -474,9 +474,9 @@ Technical devices stationary on parking lot must be able to handle the following
 
 #### PoC solution
 **Assumptions for PoC:**
-- In PoC we manage only 1 parking lot but data model will be prepared to handle multiple lots.
-- There will be only one type of parking spaces available - standard parking space for passenger cars.
-- Pricing model will be very simple - just dynamic pricing based on capacity.
+- In PoC we manage only 5 different parking lots.
+- Pricing model will be only dynamic pricing based on capacity.
+- There will be only one type of parking spaces available in all these parking lots - standard parking space for passenger cars.
 - There are no dedicated / reserved parking spaces for specific users. Any user can park in any parking space. Only limitation for using our parking lot is that the user must have a valid account with us or thousands
 - We presume all users will be always able to use mobile app to enter/exit parking lot. We will not consider any other entry/exit methods for PoC.
 - For PoC we will consider only one payment method per user. And for the sake of simplicity we presume that user must charge money in advance to be able to use our parking lot. We will check for minimum amount available to be able to enter the parking lot. If the user does not have enough money on his account, he will not be able to enter the parking lot.

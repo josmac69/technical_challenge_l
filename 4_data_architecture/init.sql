@@ -346,3 +346,65 @@ INSERT INTO user_account (
 ('User8', 'user8@example.com', '+12345678908', 'payment_key_8', 'USD', 0),
 ('User9', 'user9@example.com', '+12345678909', 'payment_key_9', 'USD', 0),
 ('User10', 'user10@example.com', '+12345678910', 'payment_key_10', 'USD', 0);
+
+-- pricing model records
+INSERT INTO pricing_model
+(name, description, basic_rate_price, current_rate_price, peak_rate_price, pricing_model_type, pricing_model_parameters, currency, created_by)
+VALUES
+('Static - Standard Hourly', 'Basic hourly rate for parking', 2.50, 2.50, NULL, 'static',
+'{"hours": [{"hour": 0, "price": 2.00}, {"hour": 1, "price": 2.00}, {"hour": 2, "price": 2.00},
+{"hour": 3, "price": 2.00}, {"hour": 4, "price": 2.00}, {"hour": 5, "price": 2.00},
+{"hour": 6, "price": 2.00}, {"hour": 7, "price": 2.50}, {"hour": 8, "price": 3.00},
+{"hour": 9, "price": 3.50}, {"hour": 10, "price": 3.50}, {"hour": 11, "price": 3.50},
+{"hour": 12, "price": 3.50}, {"hour": 13, "price": 3.50}, {"hour": 14, "price": 3.50},
+{"hour": 15, "price": 3.50}, {"hour": 16, "price": 3.50}, {"hour": 17, "price": 4.00},
+{"hour": 18, "price": 4.00}, {"hour": 19, "price": 4.00}, {"hour": 20, "price": 3.50},
+{"hour": 21, "price": 3.00}, {"hour": 22, "price": 2.50}, {"hour": 23, "price": 2.00}]}'::json, 'USD', 0);
+
+INSERT INTO pricing_model
+(name, description, basic_rate_price, current_rate_price, peak_rate_price, pricing_model_type, pricing_model_parameters, currency, created_by)
+VALUES
+('Static - Early Bird', 'Discounted rate for parking before 9am', 5.00, 5.00, 7.50, 'static',
+'{"hours": [{"hour": 0, "price": 5.00}, {"hour": 1, "price": 5.00}, {"hour": 2, "price": 5.00},
+{"hour": 3, "price": 5.00}, {"hour": 4, "price": 5.00}, {"hour": 5, "price": 5.00},
+{"hour": 6, "price": 5.00}, {"hour": 7, "price": 5.00}, {"hour": 8, "price": 5.00},
+{"hour": 9, "price": 5.00}, {"hour": 10, "price": 7.50}, {"hour": 11, "price": 7.50},
+{"hour": 12, "price": 7.50}, {"hour": 13, "price": 7.50}, {"hour": 14, "price": 7.50},
+{"hour": 15, "price": 7.50}, {"hour": 16, "price": 7.50}, {"hour": 17, "price": 7.50},
+{"hour": 18, "price": 7.50}, {"hour": 19, "price": 7.50}, {"hour": 20, "price": 7.50},
+{"hour": 21, "price": 7.50}, {"hour": 22, "price": 7.50}, {"hour": 23, "price": 7.50}]}'::json, 'USD', 0);
+
+INSERT INTO pricing_model
+(name, description, basic_rate_price, current_rate_price, peak_rate_price, pricing_model_type, pricing_model_parameters, currency, created_by)
+VALUES
+('Dynamic Price 80%', 'Price increases as lot capacity reaches 80%', 3.00, 3.00, 6.00, 'dynamic', '{"periodicity": 60,
+"rates": [{"threshold_percent": 80, "formula": "basic_rate_price + (current_rate_price - basic_rate_price) * (0.8 - capacity) / (capacity)"}] }'::json,
+'USD', 0);
+
+INSERT INTO pricing_model
+(name, description, basic_rate_price, current_rate_price, peak_rate_price, pricing_model_type, pricing_model_parameters, currency, created_by)
+VALUES
+('Dynamic Price 90%', 'Price increases as lot capacity reaches 90%', 2.50, 2.50, 5.00, 'dynamic', '{"periodicity": 30,
+"rates": [{"threshold_percent": 90, "formula": "basic_rate_price + (current_rate_price - basic_rate_price) * (0.9 - capacity) / (capacity)"}] }'::json,
+'USD', 0);
+
+INSERT INTO pricing_model
+(name, description, basic_rate_price, current_rate_price, peak_rate_price, pricing_model_type, pricing_model_parameters, currency, created_by)
+VALUES
+('Dynamic Price 50%, 80%', 'Price increases as lot capacity reaches 50% and 80%', 7.50, 7.50, 15.00, 'dynamic', '{"periodicity": 30,
+"rates": [{"threshold_percent": 50, "formula": "basic_rate_price + (current_rate_price - basic_rate_price) * (0.9 - capacity) / (capacity) + 1.00"},
+{"threshold_percent": 80, "formula": "basic_rate_price + (current_rate_price - basic_rate_price) * (0.9 - capacity) / (capacity) + 5.00"}] }'::json,
+'USD', 0);
+
+-- parking lot records
+INSERT INTO parking_lot (parking_lot_name, address, capacity, pricing_model_id, blocked, parking_lot_full, created_by)
+VALUES ('Central Parking Garage', '123 Main St', 100, 1, false, false, 0);
+INSERT INTO parking_lot (parking_lot_name, address, capacity, pricing_model_id, blocked, parking_lot_full, created_by)
+VALUES ('North Parking Lot', '789 Elm St', 60, 2, false, false, 0);
+INSERT INTO parking_lot (parking_lot_name, address, capacity, pricing_model_id, blocked, parking_lot_full, created_by)
+VALUES ('South Parking Deck', '456 Oak St', 140, 3, false, false, 0);
+INSERT INTO parking_lot (parking_lot_name, address, capacity, pricing_model_id, blocked, parking_lot_full, created_by)
+VALUES ('East Parking Lot', '555 Maple Ave', 80, 4, false, false, 0);
+INSERT INTO parking_lot (parking_lot_name, address, capacity, pricing_model_id, blocked, parking_lot_full, created_by)
+VALUES ('West Parking Garage', '777 Walnut St', 50, 5, false, false, 0);
+
