@@ -23,12 +23,12 @@ The whole process of designing the solution is based on the pragmatic principle 
 Data gathered by the app are very simple and relational by design.
 We shall use transactional database with strong consistency to avoid over booking of parking lots and problems with financial transactions.
 
-#### User master record
+#### User account master record
 Overview:
 * Holds information about user account.
 * Only one record per user_id exists.
 * Master record will be updated during financial transactions and manual user account updates.
-* Table will be indexed by user_id. Other indexes would be added based on usage.
+* Table will be indexed by user_id, email, phone and user_name. Other indexes would be added based on usage.
 * Table will most likely not be partitioned.
 * Record will be locked during update.
 
@@ -114,6 +114,8 @@ Structure:
 * `amount`: amount of money
 * `currency`: currency of the transaction
 * `account_balance`: current account balance
+* `created_at`: timestamp when account was created
+* `created_by`: identifier of the user / system who created the record
 
 Financial events:
 * `usage_charged`: money charged per our due to usage of parking lot
@@ -133,6 +135,10 @@ Financial events:
 * `account_decreased`: money send from account back to user
   * special event, this could be important in case user deletes account and we need to send him money back
   * or in case of wrong charge like double charge due to some bug in the system
+
+Notes:
+* Financial events will be created by pricing engine or other parts of the system.
+* Corresponding financial events will be created in the same transaction as parking tracking events to ensure consistency.
 
 #### Parking lot master record
 Overview:
@@ -353,7 +359,9 @@ Structure:
 * `metadata`: JSON data with additional information about the event
 
 Events:
+* `entry`: user entered the parking lot and price record for user and parking lot was created
 * `price_changed`: price decreased due to more free parking spaces available
+* `exit`: user left the parking lot and price record was deleted
 
 ### Technologies:
 - For PoC:
