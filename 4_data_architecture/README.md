@@ -11,25 +11,30 @@ We are managing parking lots that a client can check with a mobile app. An app c
 
 ## Solution
 
-The definition of the whole task is would require further discussions to understand better all the details.
+The whole task would require further discussions to understand better all the details.
+For example what type of parking lot are we actually managing? General public one or lot by some supermarket? Based on this we can expect different usage patterns and different seasonality of data.
+
 But since this is a technical challenge I will list my assumptions and provide solution based on them.
+
 The whole process of designing the solution is based on the pragmatic principle - [Make it Work, Make It Right, Make It Fast](https://wiki.c2.com/?MakeItWorkMakeItRightMakeItFast)
+
 
 ### Data model
 Data gathered by the app are very simple and relational by design.
 We shall use transactional database with strong consistency to avoid over booking of parking lots and problems with financial transactions.
 
 #### User master record
-Holds information about user account.
-Only one record per user_id exists.
-Master record will be updated during financial transactions and manual user account updates.
-Table will be indexed by user_id.
-Table will most likely not be partitioned.
-Record will be locked during update.
+Overview:
+* Holds information about user account.
+* Only one record per user_id exists.
+* Master record will be updated during financial transactions and manual user account updates.
+* Table will be indexed by user_id. Other indexes would be added based on usage.
+* Table will most likely not be partitioned.
+* Record will be locked during update.
 
 Structure:
 * `user_id`: bigint automatically increased (bigserial) unique user identifier
-* `name`: user name - required
+* `user_name`: user name - required
 * `email`: user main email address - required
 * `email_verified`: flag indicating if email address is verified
 * `phone`: user main phone number - required, can be read from mobile phone where app runs, can be used for SMS notifications
@@ -41,21 +46,25 @@ Structure:
 * `account_blocked_timestamp`: timestamp when account was blocked
 * `created_at`: timestamp when account was created
 * `updated_at`: timestamp when account was updated
+* `metadata`: JSON record with additional data about user account
 
-Payment details are stored in the third party system and are referenced by key. This is to avoid storing sensitive data in our system.
-Details are not discussed in this document. Since I presume this part would require security and privacy audit which is out of scope of this document.
+Notes:
+* Payment details are stored in the third party system and are referenced by key. This way we avoid storing sensitive data in our system.
+* Details are not discussed in this document. Since I presume this part would require security and privacy audit which is out of scope of this document.
 
 ##### User account audit transactions:
-History of changes on user account. For analytical purposes.
-Data are only appended to the table, no updates or deletes are allowed. So no locking is required.
-Table will be indexed by user_id, timestamp and event_type.
-Table will most likely be partitioned by date (timestamp rounded to full date).
+Overview:
+* History of changes on user account. For analytical purposes.
+* Data are only appended to the table, no updates or deletes are allowed. So no locking is required.
+* Table will be indexed by user_id, timestamp and event_type. Other indexes would be added based on usage.
+* Table will most likely be partitioned by date (timestamp rounded to full date).
 
 Structure:
+* `audit_id`: bigint automatically increased (bigserial) unique audit transaction identifier
 * `user_id`: bigint user identifier
-* `timestamp`: timestamp of the event
+* `event_timestamp`: timestamp of the event
 * `event_type`: type of the event
-* `metadata`: additional metadata
+* `metadata`: JSON record describing data changed in the event
 
 Audit events:
 * `account_created`: account created, metadata contain all user data
@@ -71,7 +80,7 @@ Audit events:
 * `account_unblocked`: account unblocked by us (timestamp, user ID, metadata)
   * when problem is solved and we unblock account
   * user must be informed about this by email or pusher notification
-* `user_checks_availability`: user checks availability of parking lot
+* `availability_check`: user checks availability of parking lot
   * this event will be triggered by user in mobile app
   * this event will be used for analytical purposes
   * this event will be used for predictive model
@@ -87,48 +96,56 @@ Audit events:
     * we can also inform users about frequency of bookings from other users
 
 ##### User account financial transactions
-History of financial transactions on user account. For analytical purposes.
-Data are only appended to the table, no updates or deletes are allowed. So no locking is required.
-Table will be indexed by user_id, financial_transaction_id, timestamp and event_type.
-Table will most likely be partitioned by date (timestamp rounded to full date).
+Overview:
+* History of financial transactions on user account. For analytical purposes.
+* Data are only appended to the table, no updates or deletes are allowed. So no locking is required.
+* Table will be indexed by user_id, financial_transaction_id, timestamp and event_type. Other indexes would be added based on usage.
+* Table will most likely be partitioned by date (timestamp rounded to full date).
+* Table does not require audit trail because records are immutable.
 
 Structure:
 * `financial_transaction_id`: bigint automatically increased (bigserial) unique financial transaction identifier
 * `user_id`: bigint user identifier
-* `timestamp`: timestamp of the event
+* `parking_lot_id`: bigint parking lot identifier
+* `tracking_event_id`: bigint parking tracking event identifier connected with this event (entry id for usage, exit id for charging)
+* `event_timestamp`: timestamp of the event
 * `event_type`: type of the event
-* `metadata`: additional metadata
+* `metadata`: JSON record
 * `amount`: amount of money
 * `currency`: currency of the transaction
 * `account_balance`: current account balance
 
 Financial events:
-* `usage_charged`: money charged from account due to usage of parking lot (timestamp, user ID, parking lot ID, amount charged)
+* `usage_charged`: money charged per our due to usage of parking lot
+  * this event will be triggered by pricing engine for every paid period of usage
+* `usage_free`: free usage of parking lot
+  * event triggered by pricing engine for every free period of usage
+  * free usage can happen in cases like
+    * some promotion campaigns either general or personalized (user can receive free usage for example for his birthday etc)
+    * problems with parking lot or the whole system
+    * if there is some option to use parking lot for free for example for employees
+    * if there is some option like first 15 minutes are free / first hour is free etc
+* `account_charged`: event physically taking money from user account
   * this event will be triggered by `exit` event
-* `account_increased`: money send to account (timestamp, user ID, amount received).
+  * amount charged will be calculated by pricing engine as summary of all `usage_charged` and `usage_free` events
+* `account_increased`: money send to account
   * this is real moment when money is added to the account - in many cases payment using card is actually delayed
-* `account_decreased`: money send from account back to user (timestamp, user ID, amount sent, metadata)
+* `account_decreased`: money send from account back to user
   * special event, this could be important in case user deletes account and we need to send him money back
   * or in case of wrong charge like double charge due to some bug in the system
-* `free_usage`: free usage of parking lot
-  * event triggered by `exit` event from parking lot and is generated for analytical purposes
-  * this could be used for example for some promotion campaigns
-  * or in case of some problems with parking lot
-  * or in case of some problems with the whole system
-  * or if there is some option to use parking lot for free for example for employees
-  * or if there is some option like first 15 minutes are free / first hour is free etc
 
 #### Parking lot master record
-Holds information about parking lot.
-Only one record per parking lot exists.
-Master record will be updated mainly during entry/exit events and also during manual parking lot updates.
-Table will be indexed by parking_lot_id.
-Table will most likely not be partitioned.
-Record will locked during updates.
+Overview:
+* Holds information about parking lot.
+* Only one record per parking lot exists.
+* Master record will be updated mainly during entry/exit events and also during manual parking lot updates.
+* Table will be indexed by parking_lot_id. Other indexes would be added based on usage.
+* Table will most likely not be partitioned.
+* Record will locked during updates.
 
 Structure:
 * `parking_lot_id`: bigint automatically increased (bigserial) unique parking lot identifier
-* `name`: parking lot name
+* `parking_lot_name`: parking lot name
 * `address`: parking lot address
 * `capacity`: parking lot capacity
 * `pricing_model_id`: pricing model identifier
@@ -138,24 +155,26 @@ Structure:
 * `full`: flag indicating if parking lot is full
 * `full_timestamp`: timestamp when parking lot was full
 * `created_at`: timestamp when parking lot was created
-* `updated_at`: timestamp when parking lot master record was last time updated
+* `updated_at`: timestamp when parking lot master record was last time updatedtimestamp
 
-- Parking lot is an area designated for the parking of vehicles, usually outdoors and located near a building, shopping center, or public area.
-It typically consists of a paved surface with marked parking spaces. It's capacity is fixed and defined by the number of parking spaces.
-
-- For different use cases we can have different types of parking lots - for passenger cars, for trucks, for buses, for motorcycles, for bicycles, for disabled people etc. These will require different handling by a system.
+Assumptions:
+* Parking lot is an area designated for the parking of vehicles, usually outdoors and located near a building, shopping center, or public area.
+* It typically consists of a paved surface with marked parking spaces. It's capacity is fixed and defined by the number of parking spaces.
+* For different use cases we can have different types of parking lots - for passenger cars, for trucks, for buses, for motorcycles, for bicycles, for disabled people etc. These will require different handling by the system.
 
 ##### Parking lot master record audit events
-Table contains history of changes on parking lot master record.
-Data are only appended to the table, no updates or deletes are allowed. So no locking is required.
-Table will be indexed by parking_lot_id, timestamp and event_type.
-Table will most likely be partitioned by date (timestamp rounded to full date).
+Overview:
+* Table contains history of changes on parking lot master record.
+* Data are only appended to the table, no updates or deletes are allowed. So no locking is required.
+* Table will be indexed by parking_lot_id, event_timestamp and event_type. Other indexes would be added based on usage.
+* Table will most likely be partitioned by date (event_timestamp rounded to full date).
 
 Structure:
+* `audit_id`: bigint automatically increased (bigserial) unique parking lot audit identifier
 * `parking_lot_id`: bigint parking lot identifier
-* `timestamp`: timestamp of the event
+* `event_timestamp`: timestamp of the event
 * `event_type`: type of the event
-* `metadata`: additional metadata
+* `metadata`: JSON record describing the event
 * `capacity`: capacity of the parking lot after event
 
 Parking lot master record audit events:
@@ -177,20 +196,20 @@ Parking lot master record audit events:
   * ? this could be useful for the analysis, requires further discussion
 
 ##### Parking lot tracking events
-Tracks events on parking lot related to entry and exit of cars and connection with the system on parking lot.
-Data are only appended to the table, no updates or deletes are allowed. So no locking is required.
-Table will be indexed by parking_lot_id, user_id, timestamp and event_type.
-Table will most likely be partitioned by date (timestamp rounded to full date).
+Overview:
+* Tracking events on parking lot related to entry and exit of cars and connection with the system on parking lot.
+* Data are only appended to the table, no updates or deletes are allowed. So no locking is required.
+* Table will be indexed by parking_lot_id, user_id, timestamp and event_type. Other indexes would be added based on usage.
+* Table will most likely be partitioned by date (timestamp rounded to full date).
 
 Structure:
+* `tracking_event_id`: bigint automatically increased (bigserial) unique parking lot tracking event identifier
 * `parking_lot_id`: bigint parking lot identifier
 * `user_id`: bigint user identifier
-* `timestamp`: timestamp of the event
+* `event_timestamp`: timestamp of the event
 * `event_type`: type of the event
-* `metadata`: additional metadata
-  * details about event like - entry method QR/NFC
+* `metadata`: JSON record describing the event - for example entry method QR/NFC etc
 * `capacity`: capacity of the parking lot AFTER the event
-* `financial_transaction_id`: financial transaction ID
 
 Tracking events:
 * `entry`: car enters the parking lot (timestamp, user ID, parking lot ID, entry method (QR/NFC), financial transaction id)
@@ -207,33 +226,48 @@ Tracking events:
 * `connection_restored`: generated by main system when internet/network connection is restored
   * will require some heartbeat mechanism to detect this
 
-- Even with hundreds of parking spaces available on one parking lot, frequency of events for one specific parking lot is actually quite small. Only a few events per minute for one parking lot. Frequency will be limited by capacity of entrance/exit gates. How many cars can enter/exit parking lot per minute. Many parking lots in real life can just 1 entry and 1 exit gate. Sometimes with 2 lanes, very rarely with more lines.
-  - Frequency of events can grow only in case we start managing multiple parking lots.
-
-- Data will be highly seasonal, with peaks during rush hours and in case of sales, Black Friday, days before Christmas etc. But even in this scope frequency of events is still quite small because we are still limited by capacity of gates.
-
-- Cars stay in the parking lot for quite a long time - dozens of minutes or hours. Shorter stays are not common.
+Assumptions:
+* Even with hundreds of parking spaces available on one parking lot, frequency of events for one specific parking lot is actually quite small. Only a few events per minute for one parking lot.
+* Frequency will be limited by capacity of entrance/exit gates. How many cars can enter/exit parking lot per minute. Many parking lots in real life can just 1 entry and 1 exit gate. Sometimes with 2 lanes, very rarely with more lines.
+* Frequency of events can grow only in case we start managing multiple parking lots. But even in this case, frequency of events will be still reasonably small.
+* Data will be highly seasonal. Exact pattern will depend on type of parking lot.
+  * For example parking lot for supermarket will have peaks during rush hours and in case of sales, Black Friday, days before Christmas etc.
+  * But even in this scope frequency of events will be still quite small because we are still limited by capacity of gates.
+* Cars stay in the parking lot for quite a long time - dozens of minutes or hours. Shorter stays are not common.
 
 #### Pricing model master record
-Holds information about pricing model.
-One pricing model can be used for multiple parking lots if future versions.
-Record will be locked during update.
-
-Price calculation will be encapsulated in a separate part of service and can be developed and improved independently.
-
-- Dynamic pricing model is required for common users.
-  - Price will depend on the current state of the parking lot - number of available spaces.
-  - The price will be higher when the parking lot is almost full and lower when the parking lot is almost empty.
-  - One possible way of implementing price could be for example: `price = base_price * (1 + (total_capacity - available_spaces) / total_capacity)`.
-- For long term users we can use a different price model. For example, we can offer a monthly subscription with a fixed price or discounts from normal price.
-
-- Pricing model relates to the execution of payments.
-  - For new comers we can require to charge money in advance to be able to use our parking lots. Or we can subtract money from their electronic wallet associated with our account.
-  - For long term users or for companies we can allow to pay after the fact. Account will accumulate required amount and system will send them an invoice at the end of the month.
-
-- There could be some promotions / special occasions when parking would be free of charge. For example, free parking for first 15 minutes or first 1 hour. Or free parking in case of some special events.
-
 This part would require further discussion. Because business requirements are not clear.
+
+Overview:
+* Holds information about pricing model.
+* One pricing model can be used for multiple parking lots if future versions.
+* Record will be locked during update.
+* Table will be indexed by pricing_model_id. Other indexes would be added based on usage.
+* Table will most likely not need partitioning.
+
+Pricing engine:
+* Price calculation will be encapsulated in a separate part of service and can be developed and improved independently.
+
+Pricing models:
+* Dynamic pricing model based on current capacity of the parking lot - number of available spaces.
+  * The price will be higher when the parking lot is almost full and lower when the parking lot is almost empty.
+  * There will be some base price for parking lot usage.
+  * Can have some free parking time for example first 15 minutes or 1 hour.
+  * Example formula for implementation: `price = round( base_price * (1 + (total_capacity - available_spaces) / total_capacity), 0)`
+
+* Fixed price for long term users or companies.
+  * monthly subscription with a fixed price
+  * discounts from normal price.
+  * For example, we can offer a fixed price for companies.
+
+* Static pricing model based on time of the day.
+  * Simplification of dynamic pricing model.
+  * The price will be higher during rush hours and lower during the night.
+  * There will be some base price for parking lot usage.
+  * Prices will be set arbitrarily based on business requirements.
+
+* Free parking for some special occasions.
+  * For example, free parking in case of some special events.
 
 Open questions:
 * In which moment we calculate price for parking lot usage?
@@ -274,18 +308,21 @@ Structure:
 * `updated_at`: timestamp of the last update of the pricing model
 
 #### Price per user and parking lot
-Holds information about current price for specific user and parking lot.
-Records exists only when user is currently in the parking lot.
-Only one record per user and parking lot can exist at the same time.
-Table will be indexed by user_id and parking_lot_id.
-Table will not be partitioned because it will be small.
-Rules for updating records are listed in assumptions.
-Record will be locked during updates.
+Overview:
+* Holds information about current price for specific user and parking lot.
+* Records exists only when user is currently in the parking lot.
+* Only one record per user and parking lot can exist at the same time.
+* Table will be indexed by user_id and parking_lot_id. Other indexes would be added based on usage.
+* Table will not be partitioned because it will be small.
+* Rules for updating records are listed in assumptions.
+* Record will be locked during updates.
 
 Structure:
+* `price_id`: bigint automatically increased (bigserial) unique price identifier
 * `user_id`: bigint unique user identifier
 * `parking_lot_id`: bigint unique parking lot identifier
 * `pricing_model_id`: bigint unique pricing model identifier
+* `tracking_event_id`: bigint tracking event identifier - id of entry event for this user and parking lot
 * `price`: price per hour
 * `currency`: currency of the price
 * `created_at`: timestamp of the creation of the price
@@ -299,18 +336,24 @@ Assumptions:
 * Changes are recorded in audit table.
 
 ##### Price per user and parking lot auditing events
-Holds information about price changes for specific user and parking lot.
-Records are created when user enters parking lot or price decreases.
-Records are only added, never updated or deleted. So no locking is required.
-Table will be indexed by user_id and parking_lot_id.
-Table will be partitioned by date (rounded timestamp to day).
+Overview:
+* Holds information about price changes for specific user and parking lot.
+* Records are created when user enters parking lot or price decreases.
+* Records are only added, never updated or deleted. So no locking is required.
+* Table will be indexed by user_id and parking_lot_id.
+* Table will be partitioned by date (rounded timestamp to day).
 
 Structure:
+* `audit_id`: bigint automatically increased (bigserial) unique audit identifier
 * `user_id`: bigint unique user identifier
 * `parking_lot_id`: bigint unique parking lot identifier
-* `timestamp`: timestamp of the price change
+* `event_timestamp`: timestamp of the price change
 * `price`: price per hour
 * `currency`: currency of the price
+* `metadata`: JSON data with additional information about the event
+
+Events:
+* `price_changed`: price decreased due to more free parking spaces available
 
 ### Technologies:
 - For PoC:
