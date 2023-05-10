@@ -33,7 +33,7 @@ Overview:
 * Record will be locked during update.
 
 Structure:
-* `user_id`: bigint automatically increased (bigserial) unique user identifier
+* `user_id`: integer automatically increased (serial) unique user identifier
 * `user_name`: user name - required
 * `email`: user main email address - required
 * `email_verified`: flag indicating if email address is verified
@@ -45,7 +45,9 @@ Structure:
 * `account_blocked_reason`: reason why account is blocked
 * `account_blocked_timestamp`: timestamp when account was blocked
 * `created_at`: timestamp when account was created
+* `created_by`: ID of the user / system who created the account
 * `updated_at`: timestamp when account was updated
+* `updated_by`: ID of the user / system who updated the account
 * `metadata`: JSON record with additional data about user account
 
 Notes:
@@ -60,8 +62,8 @@ Overview:
 * Table will most likely be partitioned by date (timestamp rounded to full date).
 
 Structure:
-* `audit_id`: bigint automatically increased (bigserial) unique audit transaction identifier
-* `user_id`: bigint user identifier
+* `audit_id`: integer automatically increased (serial) unique audit transaction identifier
+* `user_id`: integer user identifier
 * `event_timestamp`: timestamp of the event
 * `event_type`: type of the event
 * `metadata`: JSON record describing data changed in the event
@@ -104,10 +106,10 @@ Overview:
 * Table does not require audit trail because records are immutable.
 
 Structure:
-* `financial_transaction_id`: bigint automatically increased (bigserial) unique financial transaction identifier
-* `user_id`: bigint user identifier
-* `parking_lot_id`: bigint parking lot identifier
-* `tracking_event_id`: bigint parking tracking event identifier connected with this event (entry id for usage, exit id for charging)
+* `financial_transaction_id`: integer automatically increased (serial) unique financial transaction identifier
+* `user_id`: integer user identifier
+* `parking_lot_id`: integer parking lot identifier
+* `tracking_event_id`: integer parking tracking event identifier connected with this event (entry id for usage, exit id for charging)
 * `event_timestamp`: timestamp of the event
 * `event_type`: type of the event
 * `metadata`: JSON record
@@ -115,7 +117,7 @@ Structure:
 * `currency`: currency of the transaction
 * `account_balance`: current account balance
 * `created_at`: timestamp when account was created
-* `created_by`: identifier of the user / system who created the record
+* `created_by`: ID of the user / system who created the record
 
 Financial events:
 * `usage_charged`: money charged per our due to usage of parking lot
@@ -150,7 +152,7 @@ Overview:
 * Record will locked during updates.
 
 Structure:
-* `parking_lot_id`: bigint automatically increased (bigserial) unique parking lot identifier
+* `parking_lot_id`: integer automatically increased (serial) unique parking lot identifier
 * `parking_lot_name`: parking lot name
 * `address`: parking lot address
 * `capacity`: parking lot capacity
@@ -161,7 +163,9 @@ Structure:
 * `full`: flag indicating if parking lot is full
 * `full_timestamp`: timestamp when parking lot was full
 * `created_at`: timestamp when parking lot was created
-* `updated_at`: timestamp when parking lot master record was last time updatedtimestamp
+* `created_by`: identifier of the user / system who created the record
+* `updated_at`: timestamp when parking lot master record was last time updated
+* `updated_by`: identifier of the user / system who updated the record
 
 Assumptions:
 * Parking lot is an area designated for the parking of vehicles, usually outdoors and located near a building, shopping center, or public area.
@@ -176,8 +180,8 @@ Overview:
 * Table will most likely be partitioned by date (event_timestamp rounded to full date).
 
 Structure:
-* `audit_id`: bigint automatically increased (bigserial) unique parking lot audit identifier
-* `parking_lot_id`: bigint parking lot identifier
+* `audit_id`: integer automatically increased (serial) unique parking lot audit identifier
+* `parking_lot_id`: integer parking lot identifier
 * `event_timestamp`: timestamp of the event
 * `event_type`: type of the event
 * `metadata`: JSON record describing the event
@@ -207,11 +211,12 @@ Overview:
 * Data are only appended to the table, no updates or deletes are allowed. So no locking is required.
 * Table will be indexed by parking_lot_id, user_id, timestamp and event_type. Other indexes would be added based on usage.
 * Table will most likely be partitioned by date (timestamp rounded to full date).
+* Table does not require audit trail as it is not possible to change the data.
 
 Structure:
-* `tracking_event_id`: bigint automatically increased (bigserial) unique parking lot tracking event identifier
-* `parking_lot_id`: bigint parking lot identifier
-* `user_id`: bigint user identifier
+* `tracking_event_id`: integer automatically increased (serial) unique parking lot tracking event identifier
+* `parking_lot_id`: integer parking lot identifier
+* `user_id`: integer user identifier
 * `event_timestamp`: timestamp of the event
 * `event_type`: type of the event
 * `metadata`: JSON record describing the event - for example entry method QR/NFC etc
@@ -233,6 +238,7 @@ Tracking events:
   * will require some heartbeat mechanism to detect this
 
 Assumptions:
+* All events are created by system. User input is not considered.
 * Even with hundreds of parking spaces available on one parking lot, frequency of events for one specific parking lot is actually quite small. Only a few events per minute for one parking lot.
 * Frequency will be limited by capacity of entrance/exit gates. How many cars can enter/exit parking lot per minute. Many parking lots in real life can just 1 entry and 1 exit gate. Sometimes with 2 lanes, very rarely with more lines.
 * Frequency of events can grow only in case we start managing multiple parking lots. But even in this case, frequency of events will be still reasonably small.
@@ -250,6 +256,26 @@ Overview:
 * Record will be locked during update.
 * Table will be indexed by pricing_model_id. Other indexes would be added based on usage.
 * Table will most likely not need partitioning.
+
+Structure:
+* `pricing_model_id`: integer automatically increased (serial) unique pricing model identifier
+* `name`: pricing model short name for internal use
+* `description`: pricing model detailed description
+* `basic_rate_price`: lowest price per hour for parking lot usage in this pricing model
+* `current_rate_price`: always contains current price per hour for parking lot usage in this pricing model
+* `peak_rate_price`: highest price per hour for parking lot usage in this pricing model - null when unlimited or not applicable
+* `pricing_model_type`: type of the pricing model - `dynamic` or `static`
+* `pricing_model_parameters`: JSON data describing changes in price over time -  null if price should not be recalculated
+  * dynamic pricing model:
+    * `periodicity`: how often price should be recalculated in minutes - 15 minutes by default
+    * `formula`: formula for calculating price based on current capacity of the parking lot
+  * static pricing model:
+    * `hours`: for static model only - array of `hour` and `price` pairs - price for specific hour of the day
+* `currency`: currency of the price
+* `created_at`: timestamp of the creation of the pricing model
+* `created_by`: ID of the user who created the pricing model
+* `updated_at`: timestamp of the last update of the pricing model
+* `updated_by`: ID of the user who last updated the pricing model
 
 Pricing engine:
 * Price calculation will be encapsulated in a separate part of service and can be developed and improved independently.
@@ -295,23 +321,29 @@ Assumptions:
   * For maintaining good relationship with users, user will be charged less in next hours when price decreases due to more free parking spaces available.
 * For the purpose of this technical challenge I presume very naive approach to pricing model. But since parameters of pricing model are stored in JSON format, it will be possible to relatively easily implement more complex pricing models in the future.
 
+#### Pricing model audit record
+Overview:
+* Holds information about changes in pricing model.
+* Records will be created every time pricing model is created of updated or deleted.
+* Table will be indexed by pricing_model_id. Other indexes would be added based on usage.
+* Table will be most likely partitioned by date - rounded event_timestamp column to day.
+
 Structure:
-* `pricing_model_id`: bigint automatically increased (bigserial) unique pricing model identifier
-* `name`: pricing model short name for internal use
-* `description`: pricing model detailed description
-* `basic_rate_price`: lowest price per hour for parking lot usage in this pricing model
-* `current_rate_price`: always contains current price per hour for parking lot usage in this pricing model
-* `peak_rate_price`: highest price per hour for parking lot usage in this pricing model - null when unlimited or not applicable
-* `pricing_model_parameters`: JSON data describing changes in price over time -  null if price should not be recalculated
-  * `type`: type of the pricing model - `dynamic` or `static`
-  * dynamic pricing model:
-    * `periodicity`: how often price should be recalculated in minutes - 15 minutes by default
-    * `formula`: formula for calculating price based on current capacity of the parking lot
-  * static pricing model:
-    * `hours`: for static model only - array of `hour` and `price` pairs - price for specific hour of the day
-* `currency`: currency of the price
-* `created_at`: timestamp of the creation of the pricing model
-* `updated_at`: timestamp of the last update of the pricing model
+* `audit_id`: integer automatically increased (serial) unique pricing model audit identifier
+* `pricing_model_id`: integer unique pricing model identifier
+* `event_timestamp`: timestamp of the event
+* `event_type`: type of the event
+* `metadata`: JSON data describing event
+* `price`: price per charging period
+
+Audit events:
+* `pricing_model_created`: pricing model was created
+* `pricing_model_updated`: pricing model was updated
+* `pricing_model_deleted`: pricing model was deleted
+* `price_changed`: price was changed for specific pricing model
+  * special record will be created when pricing engine calculates new price for specific pricing model
+  * change will be recorded also in the event `pricing_model_updated`
+  * this special record simplifies querying data for analytics purposes
 
 #### Price per user and parking lot
 Overview:
@@ -324,11 +356,11 @@ Overview:
 * Record will be locked during updates.
 
 Structure:
-* `price_id`: bigint automatically increased (bigserial) unique price identifier
-* `user_id`: bigint unique user identifier
-* `parking_lot_id`: bigint unique parking lot identifier
-* `pricing_model_id`: bigint unique pricing model identifier
-* `tracking_event_id`: bigint tracking event identifier - id of entry event for this user and parking lot
+* `price_id`: integer automatically increased (serial) unique price identifier
+* `user_id`: integer unique user identifier
+* `parking_lot_id`: integer unique parking lot identifier
+* `pricing_model_id`: integer unique pricing model identifier
+* `tracking_event_id`: integer tracking event identifier - id of entry event for this user and parking lot
 * `price`: price per hour
 * `currency`: currency of the price
 * `created_at`: timestamp of the creation of the price
@@ -350,9 +382,9 @@ Overview:
 * Table will be partitioned by date (rounded timestamp to day).
 
 Structure:
-* `audit_id`: bigint automatically increased (bigserial) unique audit identifier
-* `user_id`: bigint unique user identifier
-* `parking_lot_id`: bigint unique parking lot identifier
+* `audit_id`: integer automatically increased (serial) unique audit identifier
+* `user_id`: integer unique user identifier
+* `parking_lot_id`: integer unique parking lot identifier
 * `event_timestamp`: timestamp of the price change
 * `price`: price per hour
 * `currency`: currency of the price
