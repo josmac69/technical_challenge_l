@@ -16,6 +16,7 @@ Can you do a proposal about how to test this job with unit test, how to test a f
 * Python version of the solution is in the directory `python`.
 
 * Use make command inside this directory to operate the solution:
+  * `make clean` - stops all running containers and removes them for the clean start
   * `make start` - runs the solution using `docker compose up`
   * `make stop` - stops all running containers after tests
   * `make show-data` - shows the results from the database

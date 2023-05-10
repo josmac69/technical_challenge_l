@@ -1,4 +1,5 @@
-.PHONY: start \
+.PHONY: clean \
+	start \
 	stop \
 	show-data \
 	psql \
@@ -14,7 +15,10 @@ POSTGRESQL_DB=main
 PYLINT_CONTAINER=my_pylint
 PYTHON_SCRIPT ?= script.py
 
-start:
+clean:
+	docker ps -aq | xargs -I {} docker rm -f {}
+
+start: stop clean
 	docker compose up
 
 stop:
