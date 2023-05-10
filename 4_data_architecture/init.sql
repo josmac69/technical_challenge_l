@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS user_account (
   account_blocked_timestamp TIMESTAMP,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   created_by INTEGER NOT NULL,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_by INTEGER NOT NULL,
+  updated_at TIMESTAMP,
+  updated_by INTEGER,
   metadata jsonb
 );
 
@@ -104,7 +104,7 @@ CREATE TABLE user_account_financial_transactions (
   amount numeric NOT NULL,
   currency varchar(3) NOT NULL,
   account_balance numeric NOT NULL,
-  created_at timestamp NOT NULL,
+  created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   created_by INTEGER NOT NULL
 );
 
@@ -126,12 +126,12 @@ CREATE TABLE parking_lot (
   blocked boolean NOT NULL DEFAULT false,
   blocked_reason TEXT,
   blocked_timestamp timestamp,
-  full boolean NOT NULL DEFAULT false,
+  parking_lot_full boolean NOT NULL DEFAULT false,
   full_timestamp timestamp,
-  created_at timestamp NOT NULL,
+  created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   created_by INTEGER NOT NULL,
-  updated_at timestamp NOT NULL,
-  updated_by INTEGER NOT NULL
+  updated_at timestamp,
+  updated_by INTEGER
 );
 
 -- Create indexes
@@ -211,7 +211,7 @@ CREATE TABLE pricing_model (
   pricing_model_type TEXT NOT NULL,
   pricing_model_parameters json,
   currency varchar(3) NOT NULL,
-  created_at timestamp NOT NULL,
+  created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   created_by integer NOT NULL,
   updated_at timestamp,
   updated_by integer
@@ -276,7 +276,7 @@ CREATE TABLE user_parking_lot_price (
   tracking_event_id integer NOT NULL,
   price numeric(10, 2) NOT NULL,
   currency varchar(3) NOT NULL,
-  created_at timestamp NOT NULL,
+  created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   created_by integer NOT NULL,
   updated_at timestamp,
   updated_by integer
@@ -334,15 +334,15 @@ EXECUTE FUNCTION audit_user_parking_lot_price();
 
 -- Insert 10 different users into the user_account table
 INSERT INTO user_account (
-  user_name, email, phone, payment_details_key, currency
+  user_name, email, phone, payment_details_key, currency, created_by
 ) VALUES
-('User1', 'user1@example.com', '+12345678901', 'payment_key_1', 'USD'),
-('User2', 'user2@example.com', '+12345678902', 'payment_key_2', 'USD'),
-('User3', 'user3@example.com', '+12345678903', 'payment_key_3', 'USD'),
-('User4', 'user4@example.com', '+12345678904', 'payment_key_4', 'USD'),
-('User5', 'user5@example.com', '+12345678905', 'payment_key_5', 'USD'),
-('User6', 'user6@example.com', '+12345678906', 'payment_key_6', 'USD'),
-('User7', 'user7@example.com', '+12345678907', 'payment_key_7', 'USD'),
-('User8', 'user8@example.com', '+12345678908', 'payment_key_8', 'USD'),
-('User9', 'user9@example.com', '+12345678909', 'payment_key_9', 'USD'),
-('User10', 'user10@example.com', '+12345678910', 'payment_key_10', 'USD');
+('User1', 'user1@example.com', '+12345678901', 'payment_key_1', 'USD', 0),
+('User2', 'user2@example.com', '+12345678902', 'payment_key_2', 'USD', 0),
+('User3', 'user3@example.com', '+12345678903', 'payment_key_3', 'USD', 0),
+('User4', 'user4@example.com', '+12345678904', 'payment_key_4', 'USD', 0),
+('User5', 'user5@example.com', '+12345678905', 'payment_key_5', 'USD', 0),
+('User6', 'user6@example.com', '+12345678906', 'payment_key_6', 'USD', 0),
+('User7', 'user7@example.com', '+12345678907', 'payment_key_7', 'USD', 0),
+('User8', 'user8@example.com', '+12345678908', 'payment_key_8', 'USD', 0),
+('User9', 'user9@example.com', '+12345678909', 'payment_key_9', 'USD', 0),
+('User10', 'user10@example.com', '+12345678910', 'payment_key_10', 'USD', 0);
