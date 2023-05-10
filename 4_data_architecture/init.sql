@@ -97,6 +97,7 @@ CREATE TABLE user_account_financial_transactions (
   financial_transaction_id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL,
   parking_lot_id INTEGER NOT NULL,
+  pricing_model_id INTEGER NOT NULL,
   tracking_event_id INTEGER NOT NULL,
   event_timestamp timestamp NOT NULL,
   event_type TEXT NOT NULL,
@@ -115,6 +116,36 @@ CREATE INDEX idx_financial_transactions_event_timestamp ON user_account_financia
 CREATE INDEX idx_financial_transactions_event_type ON user_account_financial_transactions (event_type);
 CREATE INDEX idx_financial_transactions_parking_lot_id ON user_account_financial_transactions (parking_lot_id);
 CREATE INDEX idx_financial_transactions_tracking_event_id ON user_account_financial_transactions (tracking_event_id);
+
+-- trigger function for financial transaction
+CREATE OR REPLACE FUNCTION update_account_balance() RETURNS TRIGGER AS $$
+BEGIN
+  CASE
+  WHEN NEW.event_type = 'account_charged' THEN
+    UPDATE user_account
+    SET account_balance = account_balance - NEW.amount
+    WHERE user_id = NEW.user_id;
+
+    NEW.account_balance = (SELECT account_balance FROM user_account WHERE user_id = NEW.user_id);
+
+  WHEN NEW.event_type = 'account_increased' THEN
+    UPDATE user_account
+    SET account_balance = account_balance + NEW.amount
+    WHERE user_id = NEW.user_id;
+
+    NEW.account_balance = (SELECT account_balance FROM user_account WHERE user_id = NEW.user_id);
+  ELSE
+    RETURN NEW;
+  END CASE;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_account_balance_trigger
+AFTER INSERT ON user_account_financial_transactions
+FOR EACH ROW
+EXECUTE FUNCTION update_account_balance();
 
 -- parking lot table
 CREATE TABLE parking_lot (
@@ -334,18 +365,18 @@ EXECUTE FUNCTION audit_user_parking_lot_price();
 
 -- Insert 10 different users into the user_account table
 INSERT INTO user_account (
-  user_name, email, phone, payment_details_key, currency, created_by
+  user_name, email, phone, payment_details_key, currency, created_at, created_by
 ) VALUES
-('User1', 'user1@example.com', '+12345678901', 'payment_key_1', 'USD', 0),
-('User2', 'user2@example.com', '+12345678902', 'payment_key_2', 'USD', 0),
-('User3', 'user3@example.com', '+12345678903', 'payment_key_3', 'USD', 0),
-('User4', 'user4@example.com', '+12345678904', 'payment_key_4', 'USD', 0),
-('User5', 'user5@example.com', '+12345678905', 'payment_key_5', 'USD', 0),
-('User6', 'user6@example.com', '+12345678906', 'payment_key_6', 'USD', 0),
-('User7', 'user7@example.com', '+12345678907', 'payment_key_7', 'USD', 0),
-('User8', 'user8@example.com', '+12345678908', 'payment_key_8', 'USD', 0),
-('User9', 'user9@example.com', '+12345678909', 'payment_key_9', 'USD', 0),
-('User10', 'user10@example.com', '+12345678910', 'payment_key_10', 'USD', 0);
+('User1', 'user1@example.com', '+12345678901', 'payment_key_1', 'USD', '2023-05-01', 0),
+('User2', 'user2@example.com', '+12345678902', 'payment_key_2', 'USD', '2023-05-01', 0),
+('User3', 'user3@example.com', '+12345678903', 'payment_key_3', 'USD', '2023-05-01', 0),
+('User4', 'user4@example.com', '+12345678904', 'payment_key_4', 'USD', '2023-05-01', 0),
+('User5', 'user5@example.com', '+12345678905', 'payment_key_5', 'USD', '2023-05-01', 0),
+('User6', 'user6@example.com', '+12345678906', 'payment_key_6', 'USD', '2023-05-01', 0),
+('User7', 'user7@example.com', '+12345678907', 'payment_key_7', 'USD', '2023-05-01', 0),
+('User8', 'user8@example.com', '+12345678908', 'payment_key_8', 'USD', '2023-05-01', 0),
+('User9', 'user9@example.com', '+12345678909', 'payment_key_9', 'USD', '2023-05-01', 0),
+('User10', 'user10@example.com', '+12345678910', 'payment_key_10', 'USD', '2023-05-01', 0);
 
 -- pricing model records
 INSERT INTO pricing_model
@@ -408,3 +439,72 @@ VALUES ('East Parking Lot', '555 Maple Ave', 80, 4, false, false, 0);
 INSERT INTO parking_lot (parking_lot_name, address, capacity, pricing_model_id, blocked, parking_lot_full, created_by)
 VALUES ('West Parking Garage', '777 Walnut St', 50, 5, false, false, 0);
 
+INSERT INTO user_account_financial_transactions (
+    user_id,
+    parking_lot_id,
+    pricing_model_id,
+    tracking_event_id,
+    event_timestamp,
+    event_type,
+    metadata,
+    amount,
+    currency,
+    account_balance,
+    created_at,
+    created_by
+)
+VALUES
+    (1, 1, 1, 11, '2023-05-01 10:30:00', 'account_increased', '{}', 50, 'USD', 50, '2023-05-01', 1),
+    (2, 1, 1, 11, '2023-05-01 11:15:00', 'account_increased', '{}', 60, 'USD', 60, '2023-05-01', 1),
+    (3, 1, 1, 11, '2023-05-01 12:20:00', 'account_increased', '{}', 80, 'USD', 80, '2023-05-01', 1),
+    (4, 1, 1, 11, '2023-05-01 13:05:00', 'account_increased', '{}', 70, 'USD', 70, '2023-05-01', 1),
+    (5, 1, 1, 11, '2023-05-01 14:30:00', 'account_increased', '{}', 150, 'USD', 150, '2023-05-01', 1),
+    (6, 1, 1, 11, '2023-05-01 15:10:00', 'account_increased', '{}', 60, 'USD', 60, '2023-05-01', 1),
+    (7, 1, 1, 11, '2023-05-01 16:45:00', 'account_increased', '{}', 120, 'USD', 120, '2023-05-01', 1),
+    (8, 1, 1, 11, '2023-05-01 17:20:00', 'account_increased', '{}', 80, 'USD', 80, '2023-05-01', 1),
+    (9, 1, 1, 11, '2023-05-01 18:00:00', 'account_increased', '{}', 90, 'USD', 90, '2023-05-01', 1),
+    (10, 1, 1, 11, '2023-05-01 11:50:00', 'account_increased', '{}', 80, 'USD', 80, '2023-05-01', 1);
+
+INSERT INTO user_account_financial_transactions (
+  user_id,
+  parking_lot_id,
+  pricing_model_id,
+  tracking_event_id,
+  event_timestamp,
+  event_type,
+  metadata,
+  amount,
+  currency,
+  account_balance,
+  created_by
+) VALUES
+  (1, 1, 1, 11, '2023-05-10 08:31:00', 'usage_charged', '{}', 3.00, 'USD', 0, 0),
+  (1, 1, 1, 11, '2023-05-10 09:31:00', 'usage_charged', '{}', 3.50, 'USD', 0, 0),
+  (1, 1, 1, 11, '2023-05-10 10:31:00', 'usage_charged', '{}', 3.50, 'USD', 0, 0),
+  (1, 1, 1, 11, '2023-05-10 11:31:00', 'usage_charged', '{}', 3.50, 'USD', 0, 0),
+  (1, 1, 1, 11, '2023-05-10 12:31:00', 'usage_charged', '{}', 3.50, 'USD', 0, 0),
+  (1, 1, 1, 11, '2023-05-10 13:31:00', 'usage_charged', '{}', 3.50, 'USD', 0, 0),
+  (1, 1, 1, 11, '2023-05-10 14:15:00', 'account_charged', '{}', 20.50, 'USD', 0, 1);
+
+INSERT INTO user_account_financial_transactions (
+  user_id,
+  parking_lot_id,
+  pricing_model_id,
+  tracking_event_id,
+  event_timestamp,
+  event_type,
+  metadata,
+  amount,
+  currency,
+  account_balance,
+  created_by
+) VALUES
+  (2, 1, 1, 11, '2023-05-10 12:45:00', 'usage_charged', '{}', 3.50, 'USD', 0, 0),
+  (2, 1, 1, 11, '2023-05-10 13:45:00', 'usage_charged', '{}', 3.50, 'USD', 0, 0),
+  (2, 1, 1, 11, '2023-05-10 14:45:00', 'usage_charged', '{}', 3.50, 'USD', 0, 0),
+  (2, 1, 1, 11, '2023-05-10 15:45:00', 'usage_charged', '{}', 3.50, 'USD', 0, 0),
+  (2, 1, 1, 11, '2023-05-10 16:45:00', 'usage_charged', '{}', 3.50, 'USD', 0, 0),
+  (2, 1, 1, 11, '2023-05-10 17:45:00', 'usage_charged', '{}', 4.00, 'USD', 0, 0),
+  (2, 1, 1, 11, '2023-05-10 18:45:00', 'usage_charged', '{}', 4.00, 'USD', 0, 0),
+  (2, 1, 1, 11, '2023-05-10 19:45:00', 'usage_charged', '{}', 4.00, 'USD', 0, 0),
+  (2, 1, 1, 11, '2023-05-10 20:11:00', 'account_charged', '{}', 29.50, 'USD', 0, 1);

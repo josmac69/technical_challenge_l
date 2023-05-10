@@ -109,13 +109,14 @@ Structure:
 * `financial_transaction_id`: integer automatically increased (serial) unique financial transaction identifier
 * `user_id`: integer user identifier
 * `parking_lot_id`: integer parking lot identifier
+* `pricing_model_id`: integer pricing model identifier
 * `tracking_event_id`: integer parking tracking event identifier connected with this event (entry id for usage, exit id for charging)
 * `event_timestamp`: timestamp of the event
 * `event_type`: type of the event
 * `metadata`: JSON record
 * `amount`: amount of money
 * `currency`: currency of the transaction
-* `account_balance`: current account balance
+* `account_balance`: account balance AFTER the transaction
 * `created_at`: timestamp when account was created
 * `created_by`: ID of the user / system who created the record
 
@@ -494,3 +495,9 @@ Technical devices stationary on parking lot must be able to handle the following
 - We will allow multiple pricing models based on the parking lot location, type of parking space, time of the day, day of the week, season, etc.
 - We will allow discounts for long term users. or fixed monthly subscription which will allow users to use our parking lots without any additional charges.
 
+### Predictive machine learning model
+* I tried to implement ARIMA (AutoRegressive Integrated Moving Average) model, which is a popular time-series forecasting model implemented in Python for predicting future values based on past observations.
+* Description can be found for example in this article [ARIMA Model – Complete Guide to Time Series Forecasting in Python](https://www.machinelearningplus.com/time-series/arima-model-time-series-forecasting-python/)
+* Due to lack of time I did not connect it with PostgreSQL solution described above and created simple script to generate random data for the model. See the file `generate_data.py` in this directory.
+* Model itself is implemented in the file `ml_script.py` in this directory. It gives very simple prediction for next day.
+* However I did not finish unittests properly, that script is failing with an error.
