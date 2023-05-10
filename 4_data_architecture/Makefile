@@ -1,7 +1,9 @@
 .PHONY: \
 	clean \
 	build_python \
+	pylint \
 	run_python \
+	unittest \
 	start_postgres \
 	stop_postgres \
 	tables \
