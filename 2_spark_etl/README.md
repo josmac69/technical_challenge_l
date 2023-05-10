@@ -13,13 +13,16 @@ Can you do a proposal about how to test this job with unit test, how to test a f
 ## Solution
 
 ### Python version
+* Python version of the solution is in the directory `python`.
 
-- Python version of the solution is in the directory `python`.
+* Use make command inside this directory to operate the solution:
+  * `make start` - runs the solution using `docker compose up`
+  * `make stop` - stops all running containers after tests
+  * `make show-data` - shows the results from the database
+  * `make psql` - runs postgresql `psql` client in the container in terminal interactive mode for manual check in the database
+  * `make build-pylint` - builds pylint docker image for static code analysis
+  * `make pylint` - runs static code analysis using pylint
 
-- Use make command inside this directory to operate the solution:
-  - `make start` - runs the solution using `docker compose up`
-  - `make stop` - stops all running containers after tests
-  - `make show-data` - shows the results from the database
-  - `make psql` - runs postgresql `psql` client in the container in terminal interactive mode for manual check in the database
-  - `make build-pylint` - builds pylint docker image for static code analysis
-  - `make pylint` - runs static code analysis using pylint
+### Scala version
+* I wanted to add also working Scala version but at the end I didn't have enough time to finish it properly. So I did not commit it to the repository.
+* I can work on it later if you would want.
