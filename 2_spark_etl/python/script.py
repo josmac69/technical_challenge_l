@@ -25,7 +25,7 @@ def main():
     # Read the CSV file
     print("Reading the CSV file...")
     input_df = spark.read \
-        .option("header", "false") \
+        .option("header", "true") \
         .option("inferSchema", "true") \
         .csv("/data/events.csv") \
         .toDF("timestamp", "action")
@@ -48,7 +48,13 @@ def main():
 
     # Check if the target table exists, and create it if not
     print("Checking if the target table exists, and create it if not...")
-    table_exists = spark.catalog.tableExists("metrics")
+    try:
+        df = spark.read \
+            .jdbc(PG_URL, "metrics", properties=pg_properties)
+        table_exists = True
+    except Exception as e:
+        table_exists = False
+
     if not table_exists:
         print("Table does not exist, creating it...")
 

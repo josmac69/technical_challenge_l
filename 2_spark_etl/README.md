@@ -27,3 +27,21 @@ Can you do a proposal about how to test this job with unit test, how to test a f
 ### Scala version
 * I wanted to add also working Scala version but at the end I didn't have enough time to finish it properly. So I did not commit it to the repository.
 * I can work on it later if you would want.
+
+
+### Change log
+
+* 2023-05-15 21:08 - repaired check if target table exists
+  * Turned out originally implemented solution was a mistake, it used Spark catalog which is actually completely different functionality.
+  * After implementing new code I can now see output on the screen which suggests that the solution is working correctly.
+  * ```
+    python-spark-1  | Checking if the target table exists, and create it if not...
+    my_postgres     | 2023-05-15 19:06:29.009 UTC [67] ERROR:  relation "metrics" does not exist at character 15
+    my_postgres     | 2023-05-15 19:06:29.009 UTC [67] STATEMENT:  SELECT * FROM metrics WHERE 1=0
+    python-spark-1  | Table does not exist, creating it...
+    my_postgres     | 2023-05-15 19:06:29.125 UTC [68] ERROR:  relation "metrics" does not exist at character 15
+    my_postgres     | 2023-05-15 19:06:29.125 UTC [68] STATEMENT:  SELECT 1 FROM metrics LIMIT 1
+    python-spark-1  | 23/05/15 19:06:29 INFO CodeGenerator: Code generated in 4.084603 ms
+    ```
+    * Now it can be clearly seen that Spark code checks for the table existence in the target database which runs in the container `my_postgres`.
+
