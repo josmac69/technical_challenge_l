@@ -1,8 +1,10 @@
 # Technical Challenge L.
 
-* Repository contains my work on technical challenge for the company L. Hiring process was unfortunately unsuccessful. I turned out during discussion of my work that they expected solution tailored more to their environment. Which of course I was not able to provide since in that stage of hiring process I had only very limited information about their data platform. But still I believe I did a good work so I am sharing it here.
+* Repository contains my work on technical challenge for the company L. Hiring process was unfortunately unsuccessful. It turned out during discussion of my work that they expected solution tailored more to their environment - i.e. closer to what they already have. Which of course I was not able to provide since in that stage of hiring process I had only very limited information about their data platform. But still I believe I did a good work so I am sharing it here.
 
 * The whole challenge was set to be solved in 3 days. So I did pragmatically as much as possible. Now when hiring process ended I decided to enhance these solutions to be able to show them as fully fledged projects for my future reference.
+
+* For solving this challenge I used AI tools ChatSonic, ChatGPT and Github CoPilot.
 
 * Tasks and solutions are in the directories `task_1`, `task_2`, `task_3` and `task_4`.
   * For the simplicity all descriptions, comments and explanations for each task are in the README files in each task directory.

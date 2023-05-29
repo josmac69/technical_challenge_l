@@ -31,6 +31,8 @@ Can you do a proposal about how to test this job with unit test, how to test a f
 
 ### Change log
 
+* 2023-05-29 - added missing aggregations
+
 * 2023-05-15 21:08 - repaired check if target table exists
   * Turned out originally implemented solution was a mistake, it used Spark catalog which is actually completely different functionality.
   * After implementing new code I can now see output on the screen which suggests that the solution is working correctly.
